@@ -5,10 +5,13 @@
 //	yourflix source list | scan [ID|--all] | pause ID | resume ID | remove ID
 //	yourflix seed import RUTA-CLON-cine-t7-catalogo
 //	yourflix titles [--q TEXTO] [--kind movie|series] [--pending]
+//	yourflix identify [--retry]            (TMDB para lo que no está en la semilla)
+//	yourflix match ID_FICHA --tmdb ID      (elegir a mano; queda bloqueada)
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,16 +28,20 @@ import (
 
 	"github.com/eduardoddddddd/YourFlix/server/internal/api"
 	"github.com/eduardoddddddd/YourFlix/server/internal/compat"
+	"github.com/eduardoddddddd/YourFlix/server/internal/identify"
 	"github.com/eduardoddddddd/YourFlix/server/internal/images"
 	"github.com/eduardoddddddd/YourFlix/server/internal/scan"
 	"github.com/eduardoddddddd/YourFlix/server/internal/seed"
 	"github.com/eduardoddddddd/YourFlix/server/internal/store"
+	"github.com/eduardoddddddd/YourFlix/server/internal/tmdb"
 )
 
 const version = "0.1.0"
 
 type app struct {
 	dataDir, ffprobe, profile string
+	tmdbTokenFile             string
+	tmdb                      *tmdb.Client
 	db                        *store.DB
 }
 
@@ -45,6 +52,7 @@ func main() {
 	g.StringVar(&a.dataDir, "data", envOr("YOURFLIX_DATA", "data"), "carpeta de datos (base de datos, imágenes)")
 	g.StringVar(&a.ffprobe, "ffprobe", envOr("YOURFLIX_FFPROBE", ""), "ruta de ffprobe (por defecto: junto al ejecutable o en el PATH)")
 	g.StringVar(&a.profile, "profile", "", "perfil de la TV (por defecto el incrustado)")
+	g.StringVar(&a.tmdbTokenFile, "tmdb-token-file", envOr("YOURFLIX_TMDB_TOKEN_FILE", ""), "fichero con el token de lectura de TMDB (o TMDB_ACCESS_TOKEN / TMDB_API_KEY)")
 	g.Usage = usage
 	g.Parse(os.Args[1:])
 	args := g.Args()
@@ -73,6 +81,9 @@ func main() {
 	if a.ffprobe == "" {
 		a.ffprobe = findFFprobe()
 	}
+	if err := a.setupTMDB(); err != nil {
+		log.Fatal(err)
+	}
 
 	switch args[0] {
 	case "serve":
@@ -81,6 +92,10 @@ func main() {
 		err = a.source(args[1:])
 	case "seed":
 		err = a.seed(args[1:])
+	case "identify":
+		err = a.identify(args[1:])
+	case "match":
+		err = a.match(args[1:])
 	case "titles":
 		err = a.titles(args[1:])
 	default:
@@ -103,8 +118,11 @@ func usage() {
   yourflix source pause|resume|remove ID|ETIQUETA
   yourflix seed import RUTA       (clon de cine-t7-catalogo)
   yourflix titles [--q TEXTO] [--kind movie|series] [--pending]
+  yourflix identify [--retry]     (TMDB para lo que no está en la semilla)
+  yourflix match ID_FICHA --tmdb ID   (elegir la ficha a mano; queda bloqueada)
 
-Opciones globales: --data (o YOURFLIX_DATA), --ffprobe (o YOURFLIX_FFPROBE), --profile
+Opciones globales: --data (o YOURFLIX_DATA), --ffprobe (o YOURFLIX_FFPROBE), --profile,
+  --tmdb-token-file (o YOURFLIX_TMDB_TOKEN_FILE, TMDB_ACCESS_TOKEN, TMDB_API_KEY)
 `)
 }
 
@@ -277,20 +295,36 @@ func (a *app) titles(args []string) error {
 	fs.Parse(args)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	if *pending {
-		files, err := a.db.UnmatchedFiles()
+		ts, err := a.db.PendingTitles()
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(tw, "ARCHIVO\tFUENTE\tFICHA PROVISIONAL")
-		for _, f := range files {
-			t, _ := a.db.Title(f.TitleID)
+		fmt.Fprintln(tw, "ID_FICHA\tTIPO\tDEDUCIDO DEL NOMBRE\tARCHIVO\tCANDIDATOS TMDB (ID título año puntuación)")
+		for _, t := range ts {
+			files, _ := a.db.FilesOfTitle(t.ID)
 			name := ""
-			if t != nil {
-				name = t.Title + " " + t.Year
+			if len(files) > 0 {
+				name = files[0].SourceLabel + ": " + files[0].RelPath
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", f.RelPath, f.SourceLabel, name)
+			var m struct {
+				Candidates []identify.Candidate `json:"candidates"`
+			}
+			json.Unmarshal(t.Meta, &m)
+			var cs []string
+			for i, c := range m.Candidates {
+				if i == 3 {
+					break
+				}
+				cs = append(cs, fmt.Sprintf("%d «%s» %s %.2f", c.TMDB, c.Title, c.Year, c.Score))
+			}
+			if len(cs) == 0 {
+				cs = []string{"(sin buscar aún: yourflix identify)"}
+			}
+			fmt.Fprintf(tw, "%s\t%s\t%s %s\t%s\t%s\n", t.ID, t.Kind, t.Title, t.Year, name, strings.Join(cs, " · "))
 		}
-		return tw.Flush()
+		tw.Flush()
+		fmt.Printf("%d fichas pendientes\n", len(ts))
+		return nil
 	}
 	items, total, err := a.db.ListTitles(store.TitleQuery{Q: *q, Kind: *kind, Limit: 500})
 	if err != nil {
@@ -341,6 +375,13 @@ func (a *app) scanLoop(ctx context.Context, every time.Duration) {
 				}
 			}
 		}
+		if a.tmdb.Enabled() {
+			if rep, err := identify.Pending(ctx, a.db, a.tmdb, identify.Options{}); err != nil {
+				log.Printf("TMDB: %v", err)
+			} else if rep.Tried > 0 {
+				log.Printf("TMDB: %d identificadas, %d fusionadas con fichas existentes, %d pendientes, %d errores", rep.Identified, rep.Merged, rep.Pending, len(rep.Errors))
+			}
+		}
 		if every <= 0 {
 			return
 		}
@@ -360,4 +401,58 @@ func (a *app) serverID() string {
 	id = store.NewID()
 	a.db.Exec(`INSERT INTO settings(key,value) VALUES('serverId',?)`, id)
 	return id
+}
+
+func (a *app) setupTMDB() error {
+	c := &tmdb.Client{Token: os.Getenv("TMDB_ACCESS_TOKEN"), APIKey: os.Getenv("TMDB_API_KEY"), Cache: store.TMDBCache{DB: a.db, TTL: 30 * 24 * time.Hour}}
+	if a.tmdbTokenFile != "" {
+		b, err := os.ReadFile(a.tmdbTokenFile)
+		if err != nil {
+			return fmt.Errorf("token de TMDB: %w", err)
+		}
+		c.Token = strings.TrimSpace(string(b))
+	}
+	a.tmdb = c
+	return nil
+}
+
+func (a *app) identify(args []string) error {
+	fs := flag.NewFlagSet("identify", flag.ExitOnError)
+	retry := fs.Bool("retry", false, "reintentar también las pendientes de otras pasadas")
+	fs.Parse(args)
+	if !a.tmdb.Enabled() {
+		return tmdb.ErrNoCredentials
+	}
+	rep, err := identify.Pending(context.Background(), a.db, a.tmdb, identify.Options{Retry: *retry, Log: func(f string, v ...any) { fmt.Printf(f+"\n", v...) }})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("TMDB: %d probadas · %d identificadas · %d fusionadas con fichas existentes · %d pendientes · %d sin reintentar · %d series con capítulos nuevos · %d errores\n",
+		rep.Tried, rep.Identified, rep.Merged, rep.Pending, rep.Skipped, rep.Episodes, len(rep.Errors))
+	if rep.Pending > 0 {
+		fmt.Println("Ver candidatos: yourflix titles --pending · elegir: yourflix match ID_FICHA --tmdb ID")
+	}
+	return nil
+}
+
+func (a *app) match(args []string) error {
+	fs := flag.NewFlagSet("match", flag.ExitOnError)
+	id := fs.Int64("tmdb", 0, "ID de TMDB")
+	pos := parseInterleaved(fs, args)
+	if len(pos) != 1 || *id == 0 {
+		return errors.New("uso: match ID_FICHA --tmdb ID")
+	}
+	t, err := a.db.Title(pos[0])
+	if err != nil {
+		return err
+	}
+	if !a.tmdb.Enabled() {
+		return tmdb.ErrNoCredentials
+	}
+	out, err := identify.Apply(context.Background(), a.db, a.tmdb, t, *id, 1, true)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("«%s» → %s (%s), TMDB %d. Ficha bloqueada: ni la semilla ni TMDB la cambiarán.\n", t.Title, out.Title, out.Year, *id)
+	return nil
 }

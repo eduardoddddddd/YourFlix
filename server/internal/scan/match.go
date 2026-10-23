@@ -41,6 +41,18 @@ func (m *matcher) match(f *store.File, p parse.Parsed) string {
 		year = "" // el año de una carpeta de serie no siempre es el de estreno
 	}
 	cands, _ := m.db.TitlesByNorm(p.Kind, norm, year)
+	if year == "" && p.Kind == "movie" {
+		// Sin año, «Drácula» puede ser la de 1931, 1992 o 2025: solo vale si hay una única ficha.
+		n := 0
+		for _, t := range cands {
+			if t.MatchSource != "filename" {
+				n++
+			}
+		}
+		if n > 1 {
+			cands = filterFilename(cands)
+		}
+	}
 	var best *store.Title
 	for _, t := range cands {
 		if best == nil || (t.MatchSource != "filename" && best.MatchSource == "filename") || (year != "" && t.Year == year && best.Year != year) {
@@ -65,6 +77,16 @@ func (m *matcher) match(f *store.File, p parse.Parsed) string {
 	}
 	f.TitleID, f.MatchSource = best.ID, "filename"
 	return "filename"
+}
+
+func filterFilename(ts []*store.Title) []*store.Title {
+	var out []*store.Title
+	for _, t := range ts {
+		if t.MatchSource == "filename" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func (m *matcher) bySeedBytes(f *store.File) *store.SeedCopy {

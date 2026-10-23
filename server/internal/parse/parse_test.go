@@ -17,6 +17,9 @@ func TestFile(t *testing.T) {
 		{"Gomorra [Cap.105].mkv", "series", "Gomorra", "", 1, 5},
 		{"Retorno a Brideshead/Temporada 1/Capitulo 3.avi", "series", "Retorno a Brideshead", "", 1, 3},
 		{"The.Bear.S03E10.HDR.2160p.mkv", "series", "The Bear", "", 3, 10},
+		{"Series/The Bear/The.Bear.S01E01.1080p.mkv", "series", "The Bear", "", 1, 1},
+		{"Series/La casa de papel/La.casa.de.papel.1x01.mkv", "series", "La casa de papel", "", 1, 1},
+		{"Series/Gomorra/Temporada 2/Capitulo 4.mkv", "series", "Gomorra", "", 2, 4},
 	}
 	for _, c := range cases {
 		p := File(c.rel, "auto")
@@ -47,6 +50,7 @@ func TestNormalize(t *testing.T) {
 		"El Señor de los Anillos: El retorno del rey": "el senor de los anillos el retorno del rey",
 		"Sirāt: Trance en el desierto":                "sirat trance en el desierto",
 		"Fast & Furious 5":                            "fast y furious 5",
+		"Alien³":                                      "alien 3",
 	} {
 		if got := Normalize(in); got != want {
 			t.Errorf("Normalize(%q) = %q, want %q", in, got, want)

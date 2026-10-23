@@ -23,3 +23,11 @@
 ## ADR-003 · Emparejado de archivos con fichas — 23-10-2026
 
 En cascada: (0) misma huella ya identificada en otra fuente → mismo título (copias); (1) bytes exactos de una copia medida en la semilla, desempatando por duración (±2 s); (2) título normalizado (sin tildes ni signos) + año contra fichas de la semilla/TMDB, también por título original; (3) ficha provisional `filename`, pendiente de TMDB. Las fichas provisionales que se quedan sin archivos se borran; las de la semilla nunca (el disco puede estar desconectado). Las fichas `locked` no las pisa ninguna importación.
+
+## ADR-004 · Identificación con TMDB: prudente antes que completa — 23-10-2026
+
+**Decisión.** TMDB solo se consulta para lo que no identificó la semilla. Se busca en es-ES y en-US (los nombres de archivo vienen en cualquiera de los dos) y cada candidato se puntúa por parecido del título (Dice de bigramas sobre el título español, inglés y original), año (±1 aceptado) y popularidad. Se asigna solo si el mejor es casi idéntico (≥ 0,88), el año es compatible y no hay un rival casi igual. Sin año, dos títulos homónimos exigen que uno tenga 5 veces más votos (Alien 1979 frente a un corto); los nombres de menos de 4 letras sin año exigen ≥ 1000 votos. Lo demás queda **pendiente con sus 5 mejores candidatos** y se reintenta cada 7 días (o con `--retry`).
+
+**Por qué.** Una ficha equivocada (con su portada) es peor que una pendiente: se ve en la tele y nadie la corrige. La primera versión eligió «Parasites» en lugar de «Parásitos» y aceptó «S4 (2008)» para un archivo `s4_dts.mkv`; ambos casos tienen test.
+
+**Consecuencias.** La web de administración (fase 5) debe mostrar los pendientes con sus candidatos para elegir con un clic (hoy: `yourflix titles --pending` y `yourflix match`).

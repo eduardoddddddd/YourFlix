@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/eduardoddddddd/YourFlix/server/internal/parse"
@@ -233,4 +234,69 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		out = append(out, s)
 	}
 	return out, total, rows.Err()
+}
+
+// TitleByTMDB: ficha existente con ese ID de TMDB (para fusionar en vez de duplicar).
+func (db *DB) TitleByTMDB(kind string, id int64) (*Title, error) {
+	ts, err := db.queryTitles(`SELECT `+titleCols+` FROM titles WHERE kind=? AND tmdb_id=? AND match_source!='filename' LIMIT 1`, kind, id)
+	if err != nil || len(ts) == 0 {
+		return nil, err
+	}
+	return ts[0], nil
+}
+
+// PendingTitles: fichas provisionales (deducidas del nombre) con algún archivo disponible.
+func (db *DB) PendingTitles() ([]*Title, error) {
+	return db.queryTitles(`SELECT ` + titleCols + ` FROM titles t WHERE match_source='filename' AND locked=0
+		AND EXISTS (SELECT 1 FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL) ORDER BY norm`)
+}
+
+// MoveFiles pasa los archivos de una ficha a otra (fusión) y borra la de origen.
+func (db *DB) MoveFiles(from, to, matchSource string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE files SET title_id=?, match_source=? WHERE title_id=?`, to, matchSource, from); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM titles WHERE id=? AND locked=0`, from); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (db *DB) SetFilesMatchSource(titleID, matchSource string) error {
+	_, err := db.Exec(`UPDATE files SET match_source=? WHERE title_id=? AND match_source!='manual'`, matchSource, titleID)
+	return err
+}
+
+// SeriesMissingEpisodes: series con ficha (semilla, TMDB o manual) y algún capítulo en
+// disco cuyo «T×E» aún no está en meta.episodes.
+func (db *DB) SeriesMissingEpisodes() ([]*Title, error) {
+	ts, err := db.queryTitles(`SELECT ` + titleCols + ` FROM titles WHERE kind='series' AND match_source!='filename' AND tmdb_id IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	var out []*Title
+	for _, t := range ts {
+		var m struct {
+			Episodes map[string]json.RawMessage `json:"episodes"`
+		}
+		json.Unmarshal(t.Meta, &m)
+		files, err := db.FilesOfTitle(t.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			if f.Season != nil && f.Episode != nil {
+				if _, ok := m.Episodes[strconv.Itoa(*f.Season)+"x"+strconv.Itoa(*f.Episode)]; !ok {
+					out = append(out, t)
+					break
+				}
+			}
+		}
+	}
+	return out, nil
 }

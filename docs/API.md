@@ -25,7 +25,7 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
   "files":2,"sources":["Pruebas","aMule"],"addedAt":"2026-10-23T18:56:26Z","matched":true}]}
 ```
 
-`matched: false` = ficha provisional deducida del nombre del archivo (pendiente de TMDB).
+`matched: false` = ficha provisional deducida del nombre del archivo: TMDB no la identificó con seguridad (pendiente de elegir a mano).
 
 ## `GET /titles/{id}`
 
@@ -44,13 +44,18 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
    "stream":"/api/v1/files/eaf3b7aec499/stream"}]}
 ```
 
-- Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`.
+- Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`. Si TMDB conoce el capítulo, `episodeInfo` trae `name`, `overview`, `airDate` y `still` (URL de la foto del capítulo):
+  `"season":1,"episode":1,"episodeInfo":{"name":"El sistema","overview":"Carmy intenta…","still":"/api/v1/files/9e190eab8098/still?w=300","airDate":"2022-06-23"}`
 - `compat.status`: `direct` (tal cual) · `warn` (se reproduce, con avisos) · `optimize` (p. ej. solo DTS: **sin sonido** en la TV). Lo calcula el perfil `profiles/samsung-ls01b-2022.json`.
 - `subtitles[].text: false` = imagen (PGS/DVD): AVPlay no la entrega.
 
 ## `GET /titles/{id}/poster?w=` · `GET /titles/{id}/backdrop?w=`
 
 JPEG redimensionado en el servidor y cacheado (`Cache-Control: max-age=604800`). Anchos: `185`, `300`, `600`, `1280`, `1920` (no se amplía si el original es menor). 404 si no hay imagen, 502 si no se pudo descargar.
+
+## `GET /files/{id}/still?w=`
+
+Foto del capítulo (series identificadas con TMDB), redimensionada y cacheada como los pósteres.
 
 ## `GET|HEAD /files/{id}/stream`
 

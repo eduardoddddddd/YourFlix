@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS progress (
 	updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS tmdb_cache (url TEXT PRIMARY KEY, body BLOB NOT NULL, fetched_at TEXT NOT NULL);
 `
 
 // Open abre (o crea) la base de datos y aplica el esquema.
@@ -111,3 +112,25 @@ func NewID() string {
 }
 
 func Now() string { return time.Now().UTC().Format(time.RFC3339) }
+
+// TMDBCache guarda respuestas de TMDB (sin credenciales en la clave) para no repetir consultas.
+type TMDBCache struct {
+	DB  *DB
+	TTL time.Duration
+}
+
+func (c TMDBCache) Get(key string) ([]byte, bool) {
+	var body []byte
+	var at string
+	if err := c.DB.QueryRow(`SELECT body,fetched_at FROM tmdb_cache WHERE url=?`, key).Scan(&body, &at); err != nil {
+		return nil, false
+	}
+	if t, err := time.Parse(time.RFC3339, at); err != nil || (c.TTL > 0 && time.Since(t) > c.TTL) {
+		return nil, false
+	}
+	return body, true
+}
+
+func (c TMDBCache) Put(key string, body []byte) {
+	c.DB.Exec(`INSERT INTO tmdb_cache(url,body,fetched_at) VALUES(?,?,?) ON CONFLICT(url) DO UPDATE SET body=excluded.body,fetched_at=excluded.fetched_at`, key, body, Now())
+}

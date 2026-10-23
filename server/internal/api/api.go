@@ -38,6 +38,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/titles/{id}/{img}", s.titleImage)
 	mux.HandleFunc("GET /api/v1/files/{id}/stream", s.stream)
 	mux.HandleFunc("HEAD /api/v1/files/{id}/stream", s.stream)
+	mux.HandleFunc("GET /api/v1/files/{id}/still", s.still)
 	mux.HandleFunc("PUT /api/v1/progress/{id}", s.putProgress)
 	mux.HandleFunc("GET /api/v1/sources", s.sources)
 	return s.lanOnly(cors(mux))
@@ -116,6 +117,34 @@ type fileOut struct {
 	Compat   compat.Verdict  `json:"compat"`
 	Progress *store.Progress `json:"progress,omitempty"`
 	Stream   string          `json:"stream"`
+	Episode  *episodeOut     `json:"episodeInfo,omitempty"`
+}
+
+type episodeOut struct {
+	Name     string `json:"name,omitempty"`
+	Overview string `json:"overview,omitempty"`
+	Still    string `json:"still,omitempty"`
+	AirDate  string `json:"airDate,omitempty"`
+}
+
+type episodeMeta struct {
+	Name, Overview, Still, AirDate string
+}
+
+// episodes lee meta.episodes["T×E"] que rellena TMDB en las series.
+func episodes(meta []byte) map[string]episodeMeta {
+	var m struct {
+		Episodes map[string]episodeMeta `json:"episodes"`
+	}
+	json.Unmarshal(meta, &m)
+	return m.Episodes
+}
+
+func epKey(f *store.File) string {
+	if f.Season == nil || f.Episode == nil {
+		return ""
+	}
+	return strconv.Itoa(*f.Season) + "x" + strconv.Itoa(*f.Episode)
 }
 
 func (s *Server) title(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +159,7 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]fileOut, 0, len(files))
+	eps := episodes(t.Meta)
 	for _, f := range files {
 		var v *probe.Video
 		var a []probe.Audio
@@ -138,7 +168,14 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(f.Audio, &a)
 		json.Unmarshal(f.Subs, &sb)
 		p, _ := s.DB.ProgressOf(f.ID)
-		out = append(out, fileOut{File: f, Compat: s.Profile.Check(f.Container, f.Bitrate, v, a, sb), Progress: p, Stream: "/api/v1/files/" + f.ID + "/stream"})
+		fo := fileOut{File: f, Compat: s.Profile.Check(f.Container, f.Bitrate, v, a, sb), Progress: p, Stream: "/api/v1/files/" + f.ID + "/stream"}
+		if e, ok := eps[epKey(f)]; ok {
+			fo.Episode = &episodeOut{Name: e.Name, Overview: e.Overview, AirDate: e.AirDate}
+			if e.Still != "" {
+				fo.Episode.Still = "/api/v1/files/" + f.ID + "/still?w=300"
+			}
+		}
+		out = append(out, fo)
 	}
 	writeJSON(w, map[string]any{
 		"title":    t,
@@ -166,6 +203,36 @@ func (s *Server) titleImage(w http.ResponseWriter, r *http.Request) {
 	path, err := s.Images.Get(r.Context(), ref, width)
 	if err != nil {
 		s.Log.Printf("imagen %s/%s: %v", t.ID, r.PathValue("img"), err)
+		http.Error(w, "imagen no disponible", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=604800")
+	http.ServeFile(w, r, path)
+}
+
+// still: foto del capítulo (TMDB), redimensionada y cacheada como los pósteres.
+func (s *Server) still(w http.ResponseWriter, r *http.Request) {
+	f, err := s.DB.File(r.PathValue("id"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	t, err := s.DB.Title(f.TitleID)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	ref := episodes(t.Meta)[epKey(f)].Still
+	if ref == "" {
+		http.NotFound(w, r)
+		return
+	}
+	width, _ := strconv.Atoi(r.URL.Query().Get("w"))
+	if !images.Widths[width] {
+		width = 300
+	}
+	path, err := s.Images.Get(r.Context(), ref, width)
+	if err != nil {
 		http.Error(w, "imagen no disponible", http.StatusBadGateway)
 		return
 	}

@@ -60,11 +60,24 @@ func File(rel, sourceKind string) Parsed {
 	p := Parsed{Kind: "movie", Season: season, Episode: episode}
 	if isSeries {
 		p.Kind = "series"
-		name := top
-		if name == "" {
-			name = stem[:cut]
+		// «The.Bear.S01E01.mkv»: el nombre va antes del patrón. Si no lo hay
+		// («Capítulo 3.avi»), la carpeta más cercana que no sea de temporada ni genérica.
+		folder, folderYear := "", ""
+		for i := len(parts) - 2; i >= 0; i-- {
+			if !reSeason.MatchString(parts[i]) && !genericDir[Normalize(parts[i])] {
+				folder, folderYear = Title(parts[i])
+				break
+			}
 		}
-		p.Title, p.Year = Title(name)
+		if episode != nil {
+			p.Title, p.Year = Title(stem[:cut])
+		}
+		if p.Title == "" || reEpisode.MatchString(p.Title) {
+			// sin patrón de capítulo (fuente marcada como series) o «Capítulo 3.avi»
+			p.Title, p.Year = folder, folderYear
+		} else if p.Year == "" && Normalize(folder) == Normalize(p.Title) {
+			p.Year = folderYear // «Westworld 2016/Westworld 2x05.mkv»
+		}
 		if p.Title == "" {
 			p.Title, p.Year = Title(stem)
 		}
@@ -77,6 +90,8 @@ func File(rel, sourceKind string) Parsed {
 	}
 	return p
 }
+
+var genericDir = map[string]bool{"series": true, "serie": true, "tv": true, "tv shows": true, "shows": true, "peliculas": true, "pelis": true, "pelis2": true, "movies": true, "films": true, "videos": true, "descargas": true, "downloads": true, "incoming": true}
 
 // episodeOf busca SxxEyy, NxNN o Cap.105 y devuelve dónde empieza el patrón.
 func episodeOf(s string) (season, episode *int, cut int) {
@@ -135,7 +150,7 @@ var fold = strings.NewReplacer(
 	"ó", "o", "ò", "o", "ö", "o", "ô", "o", "õ", "o", "ø", "o",
 	"ú", "u", "ù", "u", "ü", "u", "û", "u",
 	"ñ", "n", "ç", "c", "ß", "ss", "æ", "ae", "œ", "oe", "ā", "a",
-	"&", " y ",
+	"&", " y ", "¹", " 1", "²", " 2", "³", " 3", // «Alien³» no es «Alien»
 )
 
 // Normalize: minúsculas, sin tildes ni signos, espacios simples. Sirve para emparejar.

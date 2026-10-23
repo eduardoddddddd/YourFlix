@@ -14,15 +14,28 @@ $Y seed import RUTA/cine-t7-catalogo            # carga inicial: fichas y portad
 $Y source add "E:\pelis" --label "Samsung T7"   # tantas fuentes como quieras
 $Y source add "F:\" --label "USB Patriot" --exclude "*sample*"
 $Y source scan --all
-$Y titles                                        # catálogo; --pending: sin ficha verificada
-$Y serve                                         # API en :8787 (re-escanea cada 30 min)
+$Y --tmdb-token-file secrets/tmdb.token identify   # TMDB para lo que no está en la semilla
+$Y titles --pending                              # dudosas, con sus candidatos de TMDB
+$Y --tmdb-token-file secrets/tmdb.token match ID_FICHA --tmdb ID   # elegir a mano (queda bloqueada)
+$Y titles                                        # catálogo
+$Y --tmdb-token-file secrets/tmdb.token serve    # API en :8787; re-escanea e identifica cada 30 min
 ```
 
 Compilar para el ROG Ally: `cd server && GOOS=windows GOARCH=amd64 go build -o yourflix.exe ./cmd/yourflix`; poner `ffprobe.exe` junto al ejecutable. API: [docs/API.md](docs/API.md).
 
+TMDB: token de lectura en `secrets/tmdb.token` (fuera de Git; origen: nota «TMDB API» de Joplin), o variables `TMDB_ACCESS_TOKEN` / `TMDB_API_KEY`. Sin token, todo funciona salvo la identificación de lo nuevo.
+
 **macOS:** si una fuente está en Descargas, Documentos o un disco externo, el sistema pide permiso de privacidad al proceso que lanza el servidor. Hasta concederlo, la fuente aparece como desconectada (el servidor no se bloquea).
 
 ## Estado
+
+**23-10-2026 — fase 1B terminada: TMDB para lo que no está en la semilla.**
+
+- Hecho: cliente TMDB (token v4 o clave v3, caché de 30 días en SQLite, ~20 peticiones/s, reintento en 429, credenciales fuera de caché y registros); búsqueda en español **e inglés**, puntuación por título (es/en/original), año y popularidad; asignación solo con coincidencia clara, si no queda **pendiente con candidatos**; fusión con fichas existentes (un archivo nuevo de algo que ya está en la semilla); series con nombre, sinopsis y foto de cada capítulo (también las de la semilla); `yourflix identify`, `titles --pending`, `match` (manual, bloquea la ficha); identificación automática en `serve` tras cada escaneo.
+- Probado con TMDB real (15 nombres típicos de descargas): Parasite → «Parásitos», Alien sin año → la de 1979, El laberinto del fauno, Los otros, Tesis, Torrente 2, La sociedad de la nieve, Amélie, La casa de papel; nombres basura («s4», `VID_2024…`, `pelicula_final_v2`) quedan pendientes. `go test ./...` con un TMDB simulado.
+- Límite conocido: un archivo **sin año** se empareja con la semilla si hay una sola ficha con ese título («Dracula.mkv» → Drácula 2025); con varias, queda para TMDB.
+- Sigue sin probar: el T7 conectado y el servidor en el ROG Ally.
+- Siguiente paso: **fase 2** (app de la tele contra esta API).
 
 **23-10-2026 — fase 1A hecha y carga inicial del T7 (parte de 1B).** Servidor `server/` 0.1.0:
 
