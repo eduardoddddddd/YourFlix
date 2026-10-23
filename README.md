@@ -7,9 +7,10 @@ Servidor de películas y series para casa (Asus ROG Ally con Windows 11, o Mac) 
 
 ## Estado
 
-**23-10-2026 — fase de planificación.** Solo existe el plan; no hay código.
+**23-10-2026 — fase 0 terminada, puerta G0 superada** ([ADR-001](docs/DECISIONES.md)).
 
-- Hecho: plan v1 (Opus 5.5), nombre YourFlix, servidor en el ROG Ally, fuentes múltiples, carga inicial desde `cine-t7-catalogo` y TMDB para lo nuevo. Token TMDB comprobado; vive en `secrets/tmdb.token` (fuera de Git).
-- Probado de verdad: nada todavía en la TV.
-- Pendiente de decidir: Go o Python para el servidor, perfiles de usuario, modelo de Ally y dock, perfil de formatos de la TV (memorias de Codex del usuario).
-- Siguiente paso: **fase 0** (pruebas de AVPlay en la TV real, ver PLAN.md §8).
+- Hecho: plan v1; servidor de prueba `tools/spike-server` (Go), app de prueba `tools/spike-avplay` (`Z8YFSPIKE1.YourFlixSpike`, instalada en la TV), generador de vídeos `tools/spike-media`, monitor CDP `tools/tv-monitor`, perfil `profiles/samsung-ls01b-2022.json`.
+- **Probado en la TV real** ([resultados](docs/PRUEBAS-TV.md)): reproducción directa por HTTP Range de MKV/MP4/AVI, H.264/HEVC 10 bits/XviD/4K, saltos en archivos de 2,4 y 7,6 GB, cambio de audio, SRT como texto; 0 cuelgues. DTS suena mudo (sin error); PGS no llega.
+- No probado: HDR real, servidor en el ROG Ally, DTS con otra pista compatible.
+- Pendiente de decidir: Go (lo usado en la fase 0) o Python para el servidor, perfiles de usuario, modelo de Ally y dock; completar el perfil de la TV con las memorias de Codex.
+- Siguiente paso: **fase 1A** (núcleo del servidor) y, en paralelo, **1B** (semilla T7 + TMDB).

@@ -1,0 +1,29 @@
+{
+  "id": "samsung-ls01b-2022",
+  "model": "QE43LS01BBUXXC",
+  "platform": "Tizen 6.5 · Chromium 85 · AVPlay 6.0",
+  "measured": "2026-10-23 (docs/PRUEBAS-TV.md)",
+  "pendingInput": "Completar con las memorias de Codex del usuario sobre formatos de esta TV",
+  "containers": { "direct": ["matroska", "mp4", "avi"] },
+  "video": {
+    "direct": ["h264", "hevc", "mpeg4"],
+    "hevcProfiles": ["Main", "Main 10"],
+    "maxWidth": 3840,
+    "notes": "HDR10 sin comprobar"
+  },
+  "audio": {
+    "direct": ["aac", "ac3", "eac3", "mp3"],
+    "silentlyDropped": ["dts"],
+    "unknown": ["truehd", "flac", "opus", "pcm"],
+    "trackSwitch": "setSelectTrack AUDIO ok (~150 ms)"
+  },
+  "subtitles": {
+    "appRendered": ["subrip", "ass", "ssa", "mov_text", "webvtt"],
+    "notDelivered": ["hdmv_pgs_subtitle", "dvd_subtitle"],
+    "neverCall": "setSelectTrack('TEXT')"
+  },
+  "network": {
+    "wifiMeasuredMbps": [51, 66],
+    "warnAboveMbps": 35
+  }
+}

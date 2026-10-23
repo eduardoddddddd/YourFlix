@@ -1,0 +1,38 @@
+html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:#090b10;color:#f4f1e8;font:24px/1.35 Arial,Helvetica,sans-serif}
+*{box-sizing:border-box}
+.hidden{display:none!important}
+#av-player{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:0}
+#app{position:relative;z-index:1;width:1920px;height:1080px;display:flex;flex-direction:column;background:#090b10}
+.video-mode,.video-mode body{background:transparent!important}
+.video-mode #app{visibility:hidden}
+header{height:100px;display:flex;align-items:center;justify-content:space-between;padding:0 50px;border-bottom:1px solid #292f3b}
+h1{font:400 44px Georgia,serif;margin:0;color:#e5b95c}
+h1 em{color:#9ca5b5;font-size:28px}
+#server{color:#9ca5b5;font-size:20px}
+main{flex:1;display:flex;padding:24px 40px;min-height:0}
+.pane{min-height:0;overflow:hidden}
+.files{width:760px;padding-right:30px;border-right:1px solid #292f3b}
+.info{flex:1;padding-left:34px}
+h2{font:400 26px Georgia,serif;margin:0 0 16px;color:#e5b95c}
+.item{padding:13px 18px;border-radius:12px;margin-bottom:6px;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item small{color:#9ca5b5;margin-left:10px;font-size:17px}
+.item.sel{background:#e5b95c;color:#201704}
+.item.sel small{color:#4a3a10}
+.item .res{float:right;font-size:18px}
+#detail{font-size:20px;color:#cfd4dc}
+#detail div{margin-bottom:6px}
+#detail b{color:#e5b95c;font-weight:400}
+footer{height:58px;padding:14px 50px;color:#9ca5b5;font-size:19px;border-top:1px solid #292f3b}
+.red{color:#ff6b6b}.blue{color:#6bb0ff}.yellow{color:#ffd76b}
+#hud{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:2}
+#hud .card{position:absolute;left:70px;right:70px;bottom:50px;background:rgba(9,11,16,.88);border:2px solid #e5b95c66;border-radius:20px;padding:22px 30px}
+#hud.quiet .card{display:none}
+.row{display:flex;justify-content:space-between;gap:20px}
+#hudTitle{font:400 32px Georgia,serif}
+#hudState,#hudAction{color:#e5b95c}
+.bar{height:10px;background:#292f3b;border-radius:5px;margin:16px 0;overflow:hidden}
+.bar span{display:block;height:100%;width:0;background:#e5b95c}
+.keys{margin-top:10px;color:#9ca5b5;font-size:18px}
+#sub{position:absolute;left:160px;right:160px;bottom:250px;text-align:center;font-size:44px;text-shadow:0 0 6px #000,0 2px 4px #000}
+#log{position:absolute;z-index:3;right:40px;top:110px;width:820px;max-height:560px;margin:0;padding:14px 18px;overflow:hidden;background:rgba(5,6,9,.82);border:1px solid #292f3b;border-radius:12px;color:#9fe0a8;font:15px/1.4 Menlo,Consolas,monospace;white-space:pre-wrap;pointer-events:none}
+#hud.quiet~#log{display:none}

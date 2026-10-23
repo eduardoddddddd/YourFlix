@@ -1,0 +1,88 @@
+# Fase 0 — pruebas de AVPlay en la TV real
+
+Matriz de la puerta **G0** (PLAN.md §8): ¿reproduce la Samsung The Serif los vídeos de la colección servidos por HTTP, buscando dentro del archivo, sin colgarse?
+
+## Montaje
+
+| Pieza | Detalle |
+|---|---|
+| TV | QE43LS01BBUXXC, Tizen 6.5, Chromium 85.0.4183.93, AVPlay 6.0, Wi-Fi |
+| Servidor | `tools/spike-server` (Go, `http.ServeContent`) en el Mac `192.168.1.3:8787`, Wi-Fi. Registra cada petición de AVPlay (Range, código, bytes, ms) y recibe las trazas de la app en `private/spike-log.jsonl` |
+| App | `tools/spike-avplay`, ID `Z8YFSPIKE1.YourFlixSpike` («YourFlix Pruebas»), firmada con `CineT7`. Prueba automática por archivo y modo manual con el mando |
+| Monitor | `tools/tv-monitor/cdp.mjs`: inspector remoto, latido cada 2 s y diagnóstico de bloqueo nativo |
+
+### Prueba automática (por archivo)
+
+`prepare` (≤ 30 s) → pistas (`getTotalTrackInfo`) → `play` hasta superar 2 s → `seekTo` 50 % → `jumpForward` 30 s → `jumpBackward` 30 s → `seekTo` 90 % → `seekTo` 10 % → si hay 2+ audios, `setSelectTrack('AUDIO', 2.ª)` → si hay subtítulos, `setSilentSubtitle(false)` 12 s contando `onsubtitlechange`. Un salto cuenta como bueno si la posición cae en el margen esperado **y** el tiempo sigue avanzando 2,5 s después. Nunca se llama a `setSelectTrack('TEXT')`.
+
+### Archivos
+
+Sintéticos de `tools/spike-media/make_media.sh` (imagen `testsrc` con contador de tiempo para verificar cada salto a ojo), más un MKV real:
+
+| Archivo | Contenido | Prueba |
+|---|---|---|
+| `r1_no_hay_salida_hevc_2aac_pgs.mkv` | **Real**: «No hay salida» (1987), 2,37 GB, 1 h 54 min, HEVC Main 1920×1040, AAC 2.0 spa + AAC 5.1 eng, 3 PGS | S1/S5/S6 con archivo real, PGS |
+| `s1_h264_ac3.mkv` | H.264 High 1080p + AC3 5.1 | S1 |
+| `s2_hevc10_eac3.mkv` | HEVC Main10 10 bits + E-AC3 5.1 | S2 |
+| `s3_xvid.avi`, `s3_xvid.mkv` | MPEG-4 ASP (XVID) + MP3 / AC3 | S3 |
+| `s4_dts.mkv` | H.264 + DTS 5.1 | S4 |
+| `s5_2audio.mkv` | H.264 + AC3 spa (440 Hz) + AAC eng (880 Hz) | S5 |
+| `s6_srt.mkv` | H.264 + AAC + SRT spa (por defecto) + SRT eng | S6 |
+| `s7_4k_hevc_hdr.mkv` | HEVC Main10 3840×2160, etiquetas HDR10, ~41 Mb/s, 60 s | S7 |
+| `s8_h264_aac.mp4` | H.264 + AAC, MP4 `faststart` | S8 |
+| `s9_big_7gb.mkv` | H.264 1080p ~42 Mb/s, 24 min, **7,64 GB** | S9 (offsets > 4 GB) |
+
+## Cómo repetirlo
+
+```bash
+tools/spike-media/make_media.sh                       # genera private/testmedia (≈8 GB)
+(cd tools/spike-server && go build -o ../../private/yourflix-spike .)
+private/yourflix-spike -dir private/testmedia          # o la carpeta de vídeos reales
+# compilar, firmar e instalar tools/spike-avplay como en AstroIPTV/README.md (ID Z8YFSPIKE1.YourFlixSpike)
+sdb -s 192.168.1.4:26101 shell 0 debug Z8YFSPIKE1.YourFlixSpike   # imprime «port: NNNNN»
+sdb -s 192.168.1.4:26101 forward tcp:9333 tcp:NNNNN
+node tools/tv-monitor/cdp.mjs monitor &
+node tools/tv-monitor/cdp.mjs eval 'spike.autoAll(); "iniciada"'
+python3 tools/spike-media/summarize.py private/spike-log.jsonl --from <línea inicial>
+```
+
+Con el mando: ▲▼ elegir, OK reproducir, Rojo prueba automática, Azul todos, Amarillo modo 4K (`SET_MODE_4K`).
+
+## Resultados (23-10-2026)
+
+Tres rondas en la TV real (unas 20 pruebas automáticas por archivo y ronda), servidor y TV por **Wi-Fi**. Monitor CDP activo: **0 latidos perdidos, 0 excepciones, ningún cuelgue** en toda la sesión. La tabla es la ronda final; el tiempo de cada salto es lo que tarda el vídeo en **volver a avanzar**.
+
+| Archivo | prepare | arranque | continuo 20 s | salto 50 % | +30 s | −30 s | salto 90 % | 10 % | audio 2.ª pista | subtítulos |
+|---|---|---|---|---|---|---|---|---|---|---|
+| r1 «No hay salida» HEVC 2,37 GB | ✓ 2,3 s | ✓ 4,8 s | ✓ 0 cortes | ✓ 1,3 s | ✓ 1,3 s | ✓ 1,3 s | ✓ 1,3 s | ✓ 1,5 s | ✓ (150 ms) | PGS: 0 recibidos |
+| s1 H.264 + AC3 | ✓ 0,6 s | ✓ 4,8 s | ✓ 0 | ✓ 0,8 s | ✓ 0,8 s | ✓ 1,0 s | ✓ 0,8 s | ✓ 1,0 s | — | — |
+| s2 HEVC Main10 + E-AC3 | ✓ 0,4 s | ✓ 4,8 s | ✓ 0 | ✓ 0,8 s | ✓ 1,3 s | ✓ 1,0 s | ✓ 0,8 s | ✓ 1,0 s | — | — |
+| s3 XviD AVI / MKV | ✓ | ✓ | ✓ 0 | ✓ 0,8 s | ✓ 0,5 s | ✓ 0,5–0,8 s | ✓ 0,5 s | ✓ 0,8 s | — | — |
+| s4 H.264 + **DTS** | ✓ 0,4 s | ✓ 5,3 s | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| s5 dos audios | ✓ 0,5 s | ✓ 5,0 s | ✓ 0 | ✓ 0,8 s | ✓ 0,8 s | ✓ 0,8 s | ✓ 0,8 s | ✓ 1,0 s | ✓ | — |
+| s6 SRT embebido | ✓ 0,3 s | ✓ 4,8 s | ✓ 0 | ✓ 0,5 s | ✓ 0,5 s | ✓ 1,0 s | ✓ 0,8 s | ✓ 0,8 s | — | ✓ texto recibido |
+| s7 4K HEVC Main10 41 Mb/s | ✓ 1,0 s | ✓ 13,8 s | ✓ 0 | ✓ 4,0 s | ✗ (fuera del final)¹ | ✓ 3,8 s | ✓ 3,8 s | ✓ 3,8 s | — | — |
+| s8 MP4 H.264 + AAC | ✓ 0,3 s | ✓ 4,8 s | ✓ 0 | ✓ 0,8 s | ✓ 0,8 s | ✓ 0,8 s | ✓ 0,8 s | ✓ 0,8 s | — | — |
+| s9 **7,64 GB** 42 Mb/s | ✓ 0,7 s | ✓ 7,5 s | ⚠ 2 cortes² | ✓ 4,3 s | ✓ 4,3 s | ✓ 4,8 s | ✓ 5,3 s | ✓ 5,0 s | — | — |
+
+¹ El archivo dura 60 s y el salto apuntaba más allá del final: AVPlay devuelve `PLAYER_ERROR_SEEK_FAILED`. También lo devuelve si se salta mientras aún está llenando el búfer del salto anterior (ronda 2). La app real debe **encolar saltos** y no lanzar otro hasta que el vídeo reanude.
+² En la ronda 2 dio 0 cortes. A ~42 Mb/s el Wi-Fi Mac → TV va al límite.
+
+El «arranque» incluye 2 s de reproducción a propósito: el tiempo real hasta la primera imagen es ~2,5 s (archivos normales), ~5,5 s (7,6 GB) y ~11 s (4K).
+
+### Conclusiones para G0
+
+1. **Reproducción directa por HTTP Range: SÍ.** MKV, MP4 y AVI se reproducen y buscan sin problemas, también un MKV real de 2,4 GB y uno de 7,6 GB con posiciones pedidas de hasta **7,64 GB** (sin límite de 4 GB). AVPlay usa siempre `Range` (206), con un `User-Agent: samsung-agent/1.1`, y lee el final del archivo al abrir (índice MKV).
+2. **Códecs de vídeo:** H.264, HEVC Main y Main10 (10 bits), MPEG-4 ASP (XviD) y HEVC 4K: **todos directos**.
+3. **Audio:** AC3, E-AC3, AAC (2.0 y 5.1) y MP3 directos. **DTS: no cuelga, pero AVPlay descarta la pista en silencio** (`getTotalTrackInfo` solo lista el vídeo, sin error): el vídeo se ve **sin sonido**. El servidor tiene que marcarlo y optimizarlo (DTS → E-AC3); la TV no puede detectarlo salvo comparando con las pistas del servidor.
+4. **Cambio de audio** con `setSelectTrack('AUDIO')` en archivo: funciona, ~150 ms, sin cuelgue.
+5. **Subtítulos:** SRT embebido llega como texto por `onsubtitlechange` con `setSilentSubtitle(false)`; **PGS no llega** (0 eventos, sin cuelgue). Se mantiene el plan: el servidor extrae los subtítulos de texto a JSON y la app los dibuja (permite elegir idioma sin `setSelectTrack('TEXT')`); PGS → OCR o sin subtítulos.
+6. **Caudal Wi-Fi Mac → TV:** 51–66 Mb/s medidos. Bien hasta ~30 Mb/s (toda la colección salvo los 3 4K y remuxes); a 40+ Mb/s hay riesgo de cortes y cada salto tarda ~4–5 s. Para 4K: servidor con cable (dock del Ally) y aviso en la ficha.
+7. **`SET_MODE_4K`:** con y sin él el 4K reproduce igual (20 s sin cortes). No se ha podido comprobar a ojo si cambia la resolución de salida; queda como opción en la app.
+
+### No probado (pendiente)
+
+- **HDR real**: el archivo de prueba no llevó las etiquetas de color (ffprobe: `color_transfer=unknown`). Probar con uno de los 3 4K de la colección.
+- **Servidor en el ROG Ally** (S10): misma matriz con el binario Windows, Defender y disco USB.
+- Pistas con DTS **y** otra pista compatible en el mismo archivo (¿elige AVPlay la compatible?).
+- ASS embebido y SRT externo (los convertirá el servidor; no dependen de AVPlay).

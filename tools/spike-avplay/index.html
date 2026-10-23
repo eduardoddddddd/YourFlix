@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920,height=1080,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>YourFlix Pruebas</title>
+  <link rel="stylesheet" href="css/spike.css">
+  <script src="$WEBAPIS/webapis/webapis.js"></script>
+</head>
+<body>
+  <object id="av-player" type="application/avplayer" aria-hidden="true"></object>
+  <div id="app">
+    <header>
+      <h1>YourFlix <em>· pruebas AVPlay</em></h1>
+      <span id="server"></span>
+    </header>
+    <main>
+      <section class="pane files"><h2>Archivos</h2><div id="list"></div></section>
+      <section class="pane info"><h2>Detalle</h2><div id="detail"></div></section>
+    </main>
+    <footer>▲▼ elegir · OK reproducir · <b class="red">Rojo</b> prueba automática · <b class="blue">Azul</b> probar todos · <b class="yellow">Amarillo</b> modo 4K: <span id="mode4k">no</span></footer>
+  </div>
+  <div id="hud" class="hidden">
+    <div id="sub" class="hidden"></div>
+    <div class="card">
+      <div class="row"><strong id="hudTitle"></strong><span id="hudState"></span></div>
+      <div class="bar"><span id="hudBar"></span></div>
+      <div class="row"><span id="hudTime"></span><span id="hudAction"></span></div>
+      <div class="keys">◀▶ ±30 s · 1/5/9 ir al 10/50/90 % · 0 inicio · Verde cambiar audio · Amarillo subtítulos sí/no · Info ocultar · Atrás salir</div>
+    </div>
+  </div>
+  <pre id="log"></pre>
+  <script src="js/avplay-sim.js"></script>
+  <script src="js/spike.js"></script>
+</body>
+</html>
