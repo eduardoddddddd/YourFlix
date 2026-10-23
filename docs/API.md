@@ -1,0 +1,77 @@
+# API de YourFlix · v1
+
+Base: `http://<servidor>:8787/api/v1`. JSON UTF-8, CORS abierto. **Solo red local**: el servidor responde 403 a IP que no sean privadas o de bucle local. Los IDs son opacos y estables; **ninguna respuesta incluye rutas de disco**.
+
+> Estado: implementado en el servidor 0.1.0 (fase 1A). Aún no congelado: la fase 2 (cliente TV) puede pedir cambios, que se anotan en `docs/DECISIONES.md`.
+
+## `GET /ping`
+
+```json
+{"name":"YourFlix","version":"0.1.0","serverId":"fa3f7897c67c","api":1}
+```
+
+La TV lo usa para descubrir el servidor y comprobar que sigue siendo el mismo (`serverId`).
+
+## `GET /titles`
+
+Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y ficha: director, reparto…), `sort` (`az` por defecto | `year` | `added`), `offset`, `limit` (60 por defecto, máx. 500). Solo devuelve títulos con algún archivo disponible.
+
+```json
+{"total":1,"offset":0,"items":[{
+  "id":"t7-manual-e37844b42ec9","kind":"movie","title":"No Hay Salida","year":"1987",
+  "genres":["Suspense","Drama"],"rating":6.857,
+  "poster":"/api/v1/titles/t7-manual-e37844b42ec9/poster?w=300",
+  "backdrop":"/api/v1/titles/t7-manual-e37844b42ec9/backdrop?w=1280",
+  "files":2,"sources":["Pruebas","aMule"],"addedAt":"2026-10-23T18:56:26Z","matched":true}]}
+```
+
+`matched: false` = ficha provisional deducida del nombre del archivo (pendiente de TMDB).
+
+## `GET /titles/{id}`
+
+```json
+{"title":{"id":"…","kind":"movie","title":"No Hay Salida","original":"No Way Out","year":"1987","tmdb":10083,
+          "meta":{"synopsis":"…","genres":[…],"director":[…],"cast":[…],"runtime":116,"rating":6.857,"tagline":"…","inventory":{…}},
+          "matchSource":"seed","addedAt":"…"},
+ "poster":"/api/v1/titles/…/poster?w=600","backdrop":"/api/v1/titles/…/backdrop?w=1920",
+ "files":[{"id":"eaf3b7aec499","source":"Pruebas","size":2367101437,"duration":6863.0,"container":"mkv","bitrate":2759250,
+   "video":{"codec":"hevc","profile":"Main","width":1920,"height":1040,"bitDepth":8},
+   "audio":[{"index":1,"codec":"aac","channels":2,"language":"spa","default":true},{"index":2,"codec":"aac","channels":6,"language":"eng"}],
+   "subtitles":[{"index":3,"codec":"hdmv_pgs_subtitle","language":"spa","title":"Forzados","text":false}, …],
+   "season":null,"episode":null,"label":"",
+   "compat":{"status":"warn","reasons":["3 subtítulos en imagen (PGS/DVD) no visibles"]},
+   "progress":{"position":600,"duration":6863,"watched":false,"updatedAt":"…"},
+   "stream":"/api/v1/files/eaf3b7aec499/stream"}]}
+```
+
+- Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`.
+- `compat.status`: `direct` (tal cual) · `warn` (se reproduce, con avisos) · `optimize` (p. ej. solo DTS: **sin sonido** en la TV). Lo calcula el perfil `profiles/samsung-ls01b-2022.json`.
+- `subtitles[].text: false` = imagen (PGS/DVD): AVPlay no la entrega.
+
+## `GET /titles/{id}/poster?w=` · `GET /titles/{id}/backdrop?w=`
+
+JPEG redimensionado en el servidor y cacheado (`Cache-Control: max-age=604800`). Anchos: `185`, `300`, `600`, `1280`, `1920` (no se amplía si el original es menor). 404 si no hay imagen, 502 si no se pudo descargar.
+
+## `GET|HEAD /files/{id}/stream`
+
+El archivo tal cual, con `Range` (206), `Content-Range`, `Accept-Ranges` y `Content-Type` según contenedor (`video/x-matroska`, `video/mp4`, `video/x-msvideo`). Probado con AVPlay en la fase 0, también > 4 GB. Errores: 404 ID desconocido, **410** archivo de un disco desconectado, **503** el disco no responde en 15 s.
+
+## `PUT /progress/{fileId}`
+
+```json
+{"position":600,"duration":6863}
+```
+
+204. Con más del 92 % se marca `watched`. La TV lo envía cada 15 s y al salir.
+
+## `GET /sources`
+
+Etiqueta, tipo y estado de cada fuente (`active` | `paused` | `offline`) con su número de archivos. Sin rutas.
+
+```json
+[{"id":"d0602025fda2","label":"Pruebas","kind":"auto","state":"active","files":11}]
+```
+
+## Pendiente (fases siguientes)
+
+`GET /home` (filas de Inicio), `GET /continue`, subtítulos como cues JSON (`/files/{id}/subtitles…`), emparejamiento y endpoints de administración (`/admin/…`).
