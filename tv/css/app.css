@@ -1,0 +1,151 @@
+/* YourFlix · TV 1920×1080 · Chromium 85 (Tizen 6.5): nada de inset, aspect-ratio ni :focus-visible.
+   El foco lo gestiona nav.js con la clase .focused (no el foco del DOM). */
+:root{--bg:#090b10;--panel:#11151d;--panel2:#171c26;--text:#f4f1e8;--muted:#9ca5b5;--gold:#e5b95c;--red:#df5b57;--line:#292f3b}
+*{box-sizing:border-box}
+html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font:26px/1.35 Arial,Helvetica,sans-serif}
+.hidden{display:none!important}
+.serif{font-family:Georgia,'Times New Roman',serif}
+#av-player{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:0}
+#app{position:relative;z-index:1;width:1920px;height:1080px;background:var(--bg)}
+.video-mode,.video-mode body{background:transparent!important}
+.video-mode #app{visibility:hidden}
+
+/* Menú */
+#menu{position:absolute;left:0;top:0;width:1920px;height:96px;z-index:5;display:flex;align-items:center;padding:0 70px;background:linear-gradient(180deg,rgba(9,11,16,.95),rgba(9,11,16,0))}
+.brand{display:flex;align-items:center;gap:14px;font:400 38px Georgia,serif;margin-right:60px}
+.brand img{width:52px;height:52px;border-radius:10px}
+.brand b{color:var(--gold);font-weight:400}
+.menu-items{display:flex;gap:10px}
+.menu-item{padding:10px 24px;border-radius:30px;color:var(--muted);font-size:26px;border:2px solid transparent}
+.menu-item.active{color:var(--text)}
+.menu-item.focused{background:var(--gold);color:#201704;border-color:var(--gold)}
+#clock{margin-left:auto;color:var(--muted);font-size:26px}
+
+/* Pantallas */
+#screens{position:absolute;left:0;top:0;width:1920px;height:1080px}
+.screen{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden}
+.scroller{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;scroll-padding:150px 0 90px}
+.loading,.empty{position:absolute;left:0;top:480px;width:1920px;text-align:center;color:var(--muted);font-size:32px}
+
+/* Foco genérico */
+.f{transition:transform .12s ease-out}
+.btn{display:inline-block;padding:16px 34px;margin-right:16px;border-radius:12px;background:rgba(255,255,255,.12);font-size:28px;border:3px solid transparent;white-space:nowrap}
+.btn.primary{background:var(--gold);color:#201704;font-weight:700}
+.btn.focused{border-color:#fff;transform:scale(1.06);background:#fff;color:#111}
+.chip{display:inline-block;padding:10px 22px;margin:0 10px 10px 0;border-radius:24px;background:var(--panel2);color:var(--muted);font-size:24px;border:2px solid var(--line);white-space:nowrap}
+.chip.on{color:var(--gold);border-color:var(--gold)}
+.chip.focused{background:var(--gold);color:#201704;border-color:var(--gold)}
+
+/* Héroe de Inicio */
+.hero{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden}
+.hero-img{position:absolute;left:0;top:0;width:1920px;height:1080px;object-fit:cover;opacity:0;transition:opacity .5s}
+.hero-img.shown{opacity:1}
+.hero-shade{position:absolute;left:0;top:0;width:1920px;height:1080px;background:linear-gradient(90deg,rgba(9,11,16,.96) 0,rgba(9,11,16,.7) 38%,rgba(9,11,16,0) 70%),linear-gradient(0deg,var(--bg) 0,var(--bg) 38%,rgba(9,11,16,.2) 62%,rgba(9,11,16,0) 100%)}
+.hero-info{position:absolute;left:90px;top:140px;width:900px}
+.home-rows{position:absolute;left:0;top:590px;width:1920px;height:490px;overflow:hidden}
+.home-rows .loading{top:150px}
+.eyebrow{color:var(--gold);letter-spacing:.2em;text-transform:uppercase;font-size:20px;font-weight:700}
+.hero h1{font:400 70px/1 Georgia,serif;margin:14px 0 16px;letter-spacing:-.02em;max-height:144px;overflow:hidden}
+.meta-line{color:var(--muted);font-size:26px;margin-bottom:16px}
+.meta-line .star{color:var(--gold)}
+.synopsis{font-size:25px;line-height:1.45;color:#dad6cc;max-height:109px;overflow:hidden}
+
+/* Filas */
+.row{position:relative;padding:0 0 20px}
+.row h2{font:400 34px Georgia,serif;margin:0 0 16px 90px}
+.track{white-space:nowrap;overflow:hidden;padding:12px 90px 18px;scroll-padding:0 90px}
+.card{display:inline-block;vertical-align:top;width:220px;margin-right:22px;white-space:normal;border-radius:12px}
+.card .art{width:220px;height:330px;border-radius:12px;background:var(--panel2) center/cover no-repeat;position:relative;overflow:hidden;border:3px solid transparent}
+.card .art img{width:100%;height:100%;object-fit:cover;display:block}
+.card .ph{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;font:400 30px/1.15 Georgia,serif;color:var(--muted)}
+.card .cap{margin-top:10px;font-size:22px;color:var(--muted);height:58px;overflow:hidden}
+.card.focused{transform:scale(1.08)}
+.card.focused .art{border-color:var(--gold);box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.card.focused .cap{color:var(--text)}
+.card.wide{width:400px}
+.card.wide .art{width:400px;height:225px}
+.pbar{position:absolute;left:0;bottom:0;height:8px;background:var(--gold)}
+.badge-pending{position:absolute;right:8px;top:8px;background:rgba(9,11,16,.85);color:var(--muted);font-size:16px;padding:4px 8px;border-radius:6px}
+
+/* Rejilla */
+.grid-head{padding:130px 90px 10px}
+.grid-head h1{font:400 56px Georgia,serif;margin:0 0 18px}
+.grid{padding:10px 90px 80px}
+.grid .card{margin:0 26px 34px 0}
+
+/* Ficha */
+.detail-bg{position:absolute;left:0;top:0;width:1920px;height:1080px;object-fit:cover;opacity:.55}
+.detail-shade{position:absolute;left:0;top:0;width:1920px;height:1080px;background:linear-gradient(90deg,var(--bg) 0,rgba(9,11,16,.92) 40%,rgba(9,11,16,.3) 75%),linear-gradient(0deg,var(--bg) 0,rgba(9,11,16,0) 50%)}
+.detail{position:absolute;left:90px;top:140px;width:1100px}
+.detail h1{font:400 72px/1.02 Georgia,serif;margin:10px 0 16px}
+.tagline{font:italic 28px Georgia,serif;color:var(--gold);margin-bottom:14px}
+.detail .synopsis{max-height:152px}
+.people{margin:16px 0;font-size:23px;color:var(--muted)}
+.people b{color:var(--text);font-weight:400}
+.badges{margin:14px 0 26px}
+.badge{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border:2px solid var(--line);border-radius:8px;font-size:20px;color:#c9cfda}
+.badge.gold{border-color:rgba(229,185,92,.6);color:var(--gold)}
+.warn{color:#f0b35a;font-size:23px;margin:-10px 0 20px}
+.warn.bad{color:#ff8a80}
+.poster-big{position:absolute;right:120px;top:170px;width:400px;height:600px;border-radius:16px;object-fit:cover;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+.seasons{margin:26px 0 10px}
+.episodes{position:absolute;left:0;top:715px;width:1920px;height:365px}
+.episodes .track{padding-top:8px}
+.detail.series{top:120px}
+.detail.series h1{font-size:60px;margin:6px 0 10px}
+.detail.series .synopsis{max-height:74px}
+.detail.series .people{margin:10px 0}
+.detail.series .badges{margin:8px 0 14px}
+.detail.series .tagline{display:none}
+.episode{display:inline-block;vertical-align:top;width:400px;margin-right:24px;white-space:normal}
+.episode .art{width:400px;height:225px;border-radius:12px;background:var(--panel2);position:relative;overflow:hidden;border:3px solid transparent}
+.episode .art img{width:100%;height:100%;object-fit:cover}
+.episode .num{position:absolute;left:12px;top:10px;background:rgba(9,11,16,.85);padding:4px 10px;border-radius:6px;font-size:20px}
+.episode .ep-name{font-size:24px;margin-top:10px;height:34px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.episode .ep-desc{font-size:19px;color:var(--muted);height:52px;overflow:hidden}
+.episode.focused{transform:scale(1.05)}
+.episode.focused .art{border-color:var(--gold)}
+.watched{position:absolute;right:10px;top:10px;background:var(--gold);color:#201704;border-radius:50%;width:34px;height:34px;text-align:center;line-height:34px;font-weight:700}
+
+/* Buscar */
+.search{position:absolute;left:90px;top:140px;width:1740px}
+.query{font:400 54px Georgia,serif;height:76px;border-bottom:2px solid var(--line);margin-bottom:26px}
+.query .caret{color:var(--gold)}
+.keyboard{width:600px;display:inline-block;vertical-align:top}
+.key{display:inline-block;width:76px;height:66px;line-height:62px;text-align:center;margin:0 8px 8px 0;border-radius:10px;background:var(--panel2);font-size:28px;border:2px solid transparent}
+.key.wide{width:244px}
+.key.focused{background:var(--gold);color:#201704}
+.results{display:inline-block;vertical-align:top;width:1100px;margin-left:30px;height:820px;overflow:hidden}
+.results .card{margin:0 22px 28px 0}
+
+/* Ajustes */
+.settings{position:absolute;left:90px;top:150px;width:1300px}
+.settings h1{font:400 56px Georgia,serif;margin:0 0 30px}
+.settings p{color:var(--muted);font-size:26px}
+.settings .value{color:var(--text)}
+
+/* Reproductor */
+#player{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:10}
+#osd{position:absolute;left:0;bottom:0;width:1920px;padding:60px 90px 50px;background:linear-gradient(0deg,rgba(0,0,0,.9),rgba(0,0,0,0));transition:opacity .3s}
+#osd.off{opacity:0}
+.osd-top{display:flex;align-items:baseline;gap:24px;margin-bottom:22px}
+#osdTitle{font:400 46px Georgia,serif}
+#osdLabel{color:var(--muted);font-size:28px}
+.osd-bar{position:relative;height:10px;background:rgba(255,255,255,.2);border-radius:5px;overflow:hidden}
+.osd-bar span{position:absolute;left:0;top:0;height:10px}
+#osdBuffer{background:rgba(255,255,255,.25)}
+#osdProgress{background:var(--gold)}
+#osdSeek{width:4px;background:#fff;display:none}
+.osd-row{display:flex;justify-content:space-between;margin-top:14px;font-size:26px;color:#dcdcdc}
+#osdState{color:var(--gold)}
+.osd-keys{margin-top:14px;color:var(--muted);font-size:21px}
+.green{color:#5fd27a;font-weight:400}.yellow{color:#ffd76b;font-weight:400}
+#subtitle{position:absolute;left:180px;width:1560px;bottom:110px;text-align:center;font-size:48px;line-height:1.25;text-shadow:0 0 8px #000,0 3px 6px #000,0 0 2px #000;white-space:pre-line}
+#osd:not(.off)~#subtitle{bottom:300px}
+#playerMsg{position:absolute;left:560px;top:460px;width:800px;padding:30px;text-align:center;background:rgba(9,11,16,.9);border:2px solid var(--gold);border-radius:18px;font-size:30px}
+
+/* Diálogo y aviso */
+#dialog{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:20;background:rgba(0,0,0,.7)}
+.dialog-card{position:absolute;left:510px;top:360px;width:900px;padding:44px 50px;background:var(--panel);border:2px solid var(--gold);border-radius:22px}
+.dialog-card p{font-size:30px;margin:0 0 30px}
+#toast{position:absolute;z-index:30;left:560px;bottom:70px;width:800px;padding:20px;text-align:center;background:var(--panel2);border:2px solid var(--gold);border-radius:14px;font-size:26px}

@@ -177,8 +177,8 @@ type TitleSummary struct {
 }
 
 type TitleQuery struct {
-	Kind, Q, Sort string
-	Offset, Limit int
+	Kind, Q, Sort, Genre string
+	Offset, Limit        int
 }
 
 func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
@@ -188,10 +188,17 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		where += ` AND t.kind=?`
 		args = append(args, tq.Kind)
 	}
+	if tq.Genre != "" {
+		where += ` AND EXISTS (SELECT 1 FROM json_each(t.meta,'$.genres') WHERE value=?)`
+		args = append(args, tq.Genre)
+	}
 	if tq.Q != "" {
-		where += ` AND (t.norm LIKE ? OR lower(t.title) LIKE ? OR lower(t.original) LIKE ? OR lower(t.meta) LIKE ?)`
+		// Título (normalizado, sin tildes), original, director y reparto; no la sinopsis:
+		// «casa» no debe traer «El laberinto del fauno».
+		where += ` AND (t.norm LIKE ? OR t.norm_original LIKE ? OR lower(COALESCE(json_extract(t.meta,'$.director'),'')) LIKE ? OR lower(COALESCE(json_extract(t.meta,'$.cast'),'')) LIKE ?)`
+		norm := "%" + parse.Normalize(tq.Q) + "%"
 		like := "%" + strings.ToLower(tq.Q) + "%"
-		args = append(args, "%"+parse.Normalize(tq.Q)+"%", like, like, like)
+		args = append(args, norm, norm, like, like)
 	}
 	var total int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM titles t WHERE `+where, args...).Scan(&total); err != nil {
@@ -203,6 +210,8 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		order = `t.year DESC, t.norm`
 	case "added":
 		order = `t.added_at DESC, t.norm`
+	case "rating":
+		order = `COALESCE(json_extract(t.meta,'$.rating'),0) DESC, t.norm`
 	}
 	if tq.Limit <= 0 || tq.Limit > 500 {
 		tq.Limit = 60
@@ -299,4 +308,62 @@ func (db *DB) SeriesMissingEpisodes() ([]*Title, error) {
 		}
 	}
 	return out, nil
+}
+
+type GenreCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// Genres: géneros de los títulos disponibles, de más a menos frecuente.
+func (db *DB) Genres() ([]GenreCount, error) {
+	rows, err := db.Query(`SELECT g.value, COUNT(*) FROM titles t, json_each(t.meta,'$.genres') g
+		WHERE EXISTS (SELECT 1 FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL)
+		GROUP BY g.value ORDER BY COUNT(*) DESC, g.value`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []GenreCount{}
+	for rows.Next() {
+		var g GenreCount
+		if err := rows.Scan(&g.Name, &g.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// ContinueItem: lo último que se dejó a medias de cada título.
+type ContinueItem struct {
+	TitleID   string  `json:"titleId"`
+	FileID    string  `json:"fileId"`
+	Position  float64 `json:"position"`
+	Duration  float64 `json:"duration"`
+	UpdatedAt string  `json:"updatedAt"`
+}
+
+func (db *DB) Continue(limit int) ([]ContinueItem, error) {
+	rows, err := db.Query(`SELECT f.title_id, p.file_id, p.position, p.duration, p.updated_at
+		FROM progress p JOIN files f ON f.id=p.file_id
+		WHERE p.watched=0 AND p.position>=60 AND f.title_id IS NOT NULL AND f.missing_since IS NULL
+		ORDER BY p.updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	out := []ContinueItem{}
+	for rows.Next() && len(out) < limit {
+		var c ContinueItem
+		if err := rows.Scan(&c.TitleID, &c.FileID, &c.Position, &c.Duration, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if !seen[c.TitleID] {
+			seen[c.TitleID] = true
+			out = append(out, c)
+		}
+	}
+	return out, rows.Err()
 }

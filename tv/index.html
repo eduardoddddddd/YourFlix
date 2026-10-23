@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920,height=1080,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>YourFlix</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="$WEBAPIS/webapis/webapis.js"></script>
+</head>
+<body>
+  <!-- Plano de vídeo de AVPlay: detrás del HTML, hijo directo de body (lección de AstroIPTV). -->
+  <object id="av-player" type="application/avplayer" aria-hidden="true"></object>
+
+  <div id="app">
+    <nav id="menu">
+      <div class="brand"><img src="icon.png" alt=""><span>Your<b>Flix</b></span></div>
+      <div class="menu-items">
+        <div class="f menu-item" data-go="home">Inicio</div>
+        <div class="f menu-item" data-go="movies">Películas</div>
+        <div class="f menu-item" data-go="series">Series</div>
+        <div class="f menu-item" data-go="search">⌕ Buscar</div>
+        <div class="f menu-item" data-go="settings">Ajustes</div>
+      </div>
+      <div id="clock"></div>
+    </nav>
+    <main id="screens"></main>
+  </div>
+
+  <div id="player" class="hidden">
+    <div id="osd">
+      <div class="osd-top"><span id="osdTitle"></span><span id="osdLabel"></span></div>
+      <div class="osd-bar"><span id="osdBuffer"></span><span id="osdProgress"></span><span id="osdSeek"></span></div>
+      <div class="osd-row"><span id="osdTime"></span><span id="osdState"></span><span id="osdDuration"></span></div>
+      <div class="osd-keys">OK pausa · ◀ ▶ 10 s · ⏪ ⏩ 30 s · <b class="green">Verde</b> audio: <span id="osdAudio">—</span> · <b class="yellow">Amarillo</b> subtítulos: <span id="osdSubs">no</span> · Atrás salir</div>
+    </div>
+    <div id="subtitle" class="hidden"></div>
+    <div id="playerMsg" class="hidden"></div>
+  </div>
+
+  <div id="dialog" class="hidden"><div class="dialog-card"><p id="dialogText"></p><div id="dialogButtons"></div></div></div>
+  <div id="toast" class="hidden"></div>
+
+  <script src="js/avplay-sim.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

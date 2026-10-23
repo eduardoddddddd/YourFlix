@@ -41,6 +41,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/files/{id}/still", s.still)
 	mux.HandleFunc("PUT /api/v1/progress/{id}", s.putProgress)
 	mux.HandleFunc("GET /api/v1/sources", s.sources)
+	mux.HandleFunc("GET /api/v1/genres", s.genres)
+	mux.HandleFunc("GET /api/v1/continue", s.continueWatching)
 	return s.lanOnly(cors(mux))
 }
 
@@ -100,7 +102,7 @@ func (s *Server) titles(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	off, _ := strconv.Atoi(q.Get("offset"))
 	lim, _ := strconv.Atoi(q.Get("limit"))
-	items, total, err := s.DB.ListTitles(store.TitleQuery{Kind: q.Get("kind"), Q: q.Get("q"), Sort: q.Get("sort"), Offset: off, Limit: lim})
+	items, total, err := s.DB.ListTitles(store.TitleQuery{Kind: q.Get("kind"), Q: q.Get("q"), Sort: q.Get("sort"), Genre: q.Get("genre"), Offset: off, Limit: lim})
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -338,4 +340,55 @@ func (s *Server) sources(w http.ResponseWriter, r *http.Request) {
 		out = append(out, pub{x.ID, x.Label, x.Kind, x.State, x.Files})
 	}
 	writeJSON(w, out)
+}
+
+func (s *Server) genres(w http.ResponseWriter, r *http.Request) {
+	g, err := s.DB.Genres()
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, g)
+}
+
+// continueWatching: «Seguir viendo» de Inicio, con lo necesario para pintar la tarjeta.
+func (s *Server) continueWatching(w http.ResponseWriter, r *http.Request) {
+	items, err := s.DB.Continue(20)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	type out struct {
+		store.ContinueItem
+		Kind     string `json:"kind"`
+		Title    string `json:"title"`
+		Year     string `json:"year,omitempty"`
+		Season   *int   `json:"season,omitempty"`
+		Episode  *int   `json:"episode,omitempty"`
+		Name     string `json:"episodeName,omitempty"`
+		Poster   string `json:"poster,omitempty"`
+		Backdrop string `json:"backdrop,omitempty"`
+		Still    string `json:"still,omitempty"`
+	}
+	res := []out{}
+	for _, c := range items {
+		t, err := s.DB.Title(c.TitleID)
+		if err != nil {
+			continue
+		}
+		f, err := s.DB.File(c.FileID)
+		if err != nil {
+			continue
+		}
+		o := out{ContinueItem: c, Kind: t.Kind, Title: t.Title, Year: t.Year, Season: f.Season, Episode: f.Episode,
+			Poster: imgURL(t.ID, "poster", t.Poster, 300), Backdrop: imgURL(t.ID, "backdrop", t.Backdrop, 1280)}
+		if e, ok := episodes(t.Meta)[epKey(f)]; ok {
+			o.Name = e.Name
+			if e.Still != "" {
+				o.Still = "/api/v1/files/" + f.ID + "/still?w=300"
+			}
+		}
+		res = append(res, o)
+	}
+	writeJSON(w, res)
 }

@@ -27,7 +27,28 @@ TMDB: token de lectura en `secrets/tmdb.token` (fuera de Git; origen: nota «TMD
 
 **macOS:** si una fuente está en Descargas, Documentos o un disco externo, el sistema pide permiso de privacidad al proceso que lanza el servidor. Hasta concederlo, la fuente aparece como desconectada (el servidor no se bloquea).
 
+## App de la tele
+
+`tv/`: app Tizen `Z8YOURFLX1.YourFlix` («YourFlix»), JavaScript puro para Chromium 85, firmada con el perfil `CineT7`.
+
+```bash
+node --test tv/tests/*.test.js                       # lógica y reglas de AstroIPTV / Chromium 85
+python3 -m http.server 8790 --directory tv           # probar en el Mac: http://localhost:8790/?server=http://localhost:8787
+TIZEN="$HOME/tizen-studio/tools/ide/bin/tizen"
+cd tv && "$TIZEN" build-web -e "tests/*" -- . && "$TIZEN" package -t wgt -s CineT7 -- .buildResult
+"$TIZEN" install -n YourFlix.wgt -t QE43LS01BBUXXC -- .buildResult   # pedir permiso antes (AGENTS.md)
+```
+
+En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados como la TV); en la tele no hace nada. Teclas en el Mac: flechas, Intro, Esc (Atrás), F/R (⏩/⏪), G (verde), Y (amarillo).
+
 ## Estado
+
+**23-10-2026 — fase 2 (app de la tele) instalada en la TV.**
+
+- Hecho: Inicio con héroe que sigue al foco y filas (Seguir viendo, Añadidas, Mejor valoradas, Series, géneros); rejillas de Películas y Series con orden y géneros; ficha (sinopsis, reparto, técnica, avisos de compatibilidad, reanudar, copias); series con temporadas y capítulos (nombre, foto, visto); búsqueda con teclado en pantalla (título, director, reparto); ajustes con IP manual; descubrimiento del servidor (guardado → Mac → barrido de la /24); reproductor con cola de saltos (sin solapes: reanudar, arranque, pausa), cambio de audio, subtítulos de texto, progreso cada 15 s. Servidor: `/continue`, `/genres`, `genre=` y `sort=rating`.
+- Probado: 10 tests de Node; recorrido completo en Chromium del Mac con AVPlay simulado (reanudar + ⏩ durante la carga, ◀ ×5, ⏩ en pausa: 0 saltos solapados). En la TV real: instalada, encuentra el servidor del Mac, Inicio con 8 filas y carátulas, 10 MB de memoria JS.
+- **El usuario la probó con el mando en la TV: va bien.** Reproducción de «No Hay Salida» desde la app con el inspector: apertura en ~1 s, pausa y reanudación, salida limpia; 0 cuelgues ni excepciones.
+- Pendiente (fase 3/4): subtítulos extraídos por el servidor (elegir idioma), siguiente capítulo automático, optimizar DTS.
 
 **23-10-2026 — fase 1B terminada: TMDB para lo que no está en la semilla.**
 

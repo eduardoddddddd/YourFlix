@@ -14,7 +14,7 @@ La TV lo usa para descubrir el servidor y comprobar que sigue siendo el mismo (`
 
 ## `GET /titles`
 
-Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y ficha: director, reparto…), `sort` (`az` por defecto | `year` | `added`), `offset`, `limit` (60 por defecto, máx. 500). Solo devuelve títulos con algún archivo disponible.
+Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y ficha: director, reparto…), `sort` (`az` por defecto | `year` | `added` | `rating`), `genre` (nombre exacto de `GET /genres`), `offset`, `limit` (60 por defecto, máx. 500). Solo devuelve títulos con algún archivo disponible.
 
 ```json
 {"total":1,"offset":0,"items":[{

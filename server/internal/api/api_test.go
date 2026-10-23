@@ -111,3 +111,31 @@ func TestTitleDetailAndProgress(t *testing.T) {
 		t.Fatalf("búsqueda: %s", w.Body.String())
 	}
 }
+
+func TestContinueAndGenres(t *testing.T) {
+	h, db, _ := setup(t)
+	tt, _ := db.Title("t7-1")
+	tt.Meta = []byte(`{"genres":["Bélica","Drama"]}`)
+	db.UpsertTitle(tt, false)
+	do(h, "PUT", "/api/v1/progress/f1", lan, nil, `{"position":30,"duration":6000}`)
+	if w := do(h, "GET", "/api/v1/continue", lan, nil, ""); w.Body.String() != "[]\n" {
+		t.Fatalf("menos de 60 s no cuenta: %s", w.Body.String())
+	}
+	do(h, "PUT", "/api/v1/progress/f1", lan, nil, `{"position":1200,"duration":6000}`)
+	if w := do(h, "GET", "/api/v1/continue", lan, nil, ""); !strings.Contains(w.Body.String(), `"fileId":"f1"`) || !strings.Contains(w.Body.String(), `"title":"Platoon"`) {
+		t.Fatalf("seguir viendo: %s", w.Body.String())
+	}
+	do(h, "PUT", "/api/v1/progress/f1", lan, nil, `{"position":5800,"duration":6000}`)
+	if w := do(h, "GET", "/api/v1/continue", lan, nil, ""); w.Body.String() != "[]\n" {
+		t.Fatalf("vista (>92 %%) sale de seguir viendo: %s", w.Body.String())
+	}
+	if w := do(h, "GET", "/api/v1/genres", lan, nil, ""); !strings.Contains(w.Body.String(), `{"name":"Bélica","count":1}`) {
+		t.Fatalf("géneros: %s", w.Body.String())
+	}
+	if w := do(h, "GET", "/api/v1/titles?genre=Drama", lan, nil, ""); !strings.Contains(w.Body.String(), `"total":1`) {
+		t.Fatalf("filtro por género: %s", w.Body.String())
+	}
+	if w := do(h, "GET", "/api/v1/titles?genre=Western", lan, nil, ""); !strings.Contains(w.Body.String(), `"total":0`) {
+		t.Fatalf("filtro por género vacío: %s", w.Body.String())
+	}
+}
