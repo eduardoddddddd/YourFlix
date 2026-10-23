@@ -57,9 +57,26 @@ JPEG redimensionado en el servidor y cacheado (`Cache-Control: max-age=604800`).
 
 Foto del capítulo (series identificadas con TMDB), redimensionada y cacheada como los pósteres.
 
+## `GET /files/{id}/subtitles`
+
+Pistas de **texto** que la TV puede dibujar: internas (SRT, ASS, mov_text, WebVTT) y archivos junto al vídeo con el mismo nombre (`Película.es.srt`, `Película.en.forced.srt`, `.ass`, `.vtt`). `imageTracks` cuenta las de imagen (PGS, DVD), que no se pueden mostrar.
+
+```json
+{"tracks":[{"id":"e3","language":"spa","label":"Español (forzados)","codec":"subrip","forced":true,"source":"embedded"},
+           {"id":"x0","language":"spa","label":"Español · archivo","codec":"srt","source":"external"}],"imageTracks":0}
+```
+
+## `GET /files/{id}/subtitles/{sid}`
+
+Líneas `[[inicio, fin, "texto"], …]` en segundos, ordenadas, sin etiquetas de estilo. SRT en UTF-8 o Windows-1252. La **primera** petición de una pista interna lee el vídeo entero con ffmpeg (todas las pistas de texto de una vez) y lo guarda en `data/subs`: en un disco USB puede tardar decenas de segundos; las siguientes son instantáneas. 422 si no se pudo convertir.
+
 ## `GET|HEAD /files/{id}/stream`
 
 El archivo tal cual, con `Range` (206), `Content-Range`, `Accept-Ranges` y `Content-Type` según contenedor (`video/x-matroska`, `video/mp4`, `video/x-msvideo`). Probado con AVPlay en la fase 0, también > 4 GB. Errores: 404 ID desconocido, **410** archivo de un disco desconectado, **503** el disco no responde en 15 s.
+
+## `GET /continue`
+
+«Seguir viendo»: lo último a medias de cada título (≥ 60 s y < 92 %). En una serie cuyo último capítulo se terminó, propone el siguiente sin ver con `"next":true` y `position` 0.
 
 ## `PUT /progress/{fileId}`
 
@@ -79,4 +96,4 @@ Etiqueta, tipo y estado de cada fuente (`active` | `paused` | `offline`) con su 
 
 ## Pendiente (fases siguientes)
 
-`GET /home` (filas de Inicio), `GET /continue`, subtítulos como cues JSON (`/files/{id}/subtitles…`), emparejamiento y endpoints de administración (`/admin/…`).
+Emparejamiento y endpoints de administración (`/admin/…`).

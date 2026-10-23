@@ -2,7 +2,7 @@
 (function (YF) {
   'use strict';
   var el = YF.el, $ = YF.$, nav = YF.nav;
-  YF.version = '0.1.0';
+  YF.version = '0.2.0';
 
   var app = YF.app = { stack: [], backAt: 0 };
   var screensEl = $('screens'), menu = $('menu');
@@ -115,7 +115,7 @@
     415: 'Play', 19: 'Pause', 10252: 'PlayPause', 413: 'Stop', 417: 'FastForward', 412: 'Rewind',
     403: 'Red', 404: 'Green', 405: 'Yellow', 406: 'Blue', 457: 'Info', 427: 'ChannelUp', 428: 'ChannelDown',
     // navegador del Mac, para probar sin mando
-    71: 'Green', 89: 'Yellow', 70: 'FastForward', 82: 'Rewind', 32: 'PlayPause' };
+    71: 'Green', 89: 'Yellow', 66: 'Blue', 70: 'FastForward', 82: 'Rewind', 32: 'PlayPause' };
   var REGISTER = ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaFastForward', 'MediaRewind',
     'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue', 'Info', 'ChannelUp', 'ChannelDown'];
 

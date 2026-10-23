@@ -23,7 +23,7 @@
     });
   }
 
-  api.get = function (path) { return request('GET', api.base + '/api/v1' + path); };
+  api.get = function (path, timeout) { return request('GET', api.base + '/api/v1' + path, null, timeout); };
   api.put = function (path, body) { return request('PUT', api.base + '/api/v1' + path, body); };
   api.url = function (path) { return path ? api.base + path : ''; };
 

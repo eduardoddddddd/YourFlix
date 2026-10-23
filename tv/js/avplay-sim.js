@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   if (window.webapis && window.webapis.avplay) return;
-  var st = 'NONE', t = 0, base = 0, dur = 0, url = '', listener = {}, preparing = false, silent = true, subTimer = 0, seeking = false;
+  var st = 'NONE', t = 0, base = 0, dur = 0, url = '', listener = {}, preparing = false, silent = true, subTimer = 0, seeking = false, endTimer = 0;
   window.simHangs = [];
   function hang(why) { window.simHangs.push(why); console.error('[sim] CUELGUE: ' + why); }
   function cur() { return st === 'PLAYING' ? t + (Date.now() - base) : t; }
@@ -28,7 +28,11 @@
         st = 'READY'; ok && ok();
       }, 600);
     },
-    play: function () { if (st !== 'PLAYING') { base = Date.now(); st = 'PLAYING'; subs(); } },
+    play: function () {
+      if (st !== 'PLAYING') { base = Date.now(); st = 'PLAYING'; subs(); }
+      clearInterval(endTimer);
+      endTimer = setInterval(function () { if (st === 'PLAYING' && dur && cur() >= dur) { t = dur; st = 'READY'; clearInterval(endTimer); if (listener.onstreamcompleted) listener.onstreamcompleted(); } }, 200);
+    },
     pause: function () { t = cur(); st = 'PAUSED'; },
     stop: function () { if (preparing) hang('stop con prepare pendiente'); t = 0; st = 'IDLE'; clearInterval(subTimer); },
     close: function () { if (preparing) hang('close con prepare pendiente'); st = 'NONE'; clearInterval(subTimer); },

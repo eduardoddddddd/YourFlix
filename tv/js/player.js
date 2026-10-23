@@ -45,13 +45,37 @@
     return Math.max(0, Math.floor(t));
   };
 
+  // cueAt: línea visible en t (s) en cues ordenadas [[inicio, fin, texto], …]; búsqueda binaria.
+  YF.cueAt = function (cues, t) {
+    var lo = 0, hi = cues.length - 1, found = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (cues[mid][0] <= t) { found = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    // Puede haber solapes: mirar unas pocas anteriores que sigan vivas.
+    for (var i = found, n = 0; i >= 0 && n < 4; i--, n++) if (cues[i][1] > t) return cues[i];
+    return null;
+  };
+
+  // pickSubtitle: pista a activar al empezar. pref: null (nunca eligió), 'off' o idioma («ES»).
+  // Los forzados en el idioma del audio (diálogos en otro idioma) se activan aunque esté en 'off'.
+  YF.pickSubtitle = function (tracks, pref, audioLang) {
+    var L = function (t) { return YF.lang(t.language); };
+    if (pref && pref !== 'off') {
+      var full = tracks.filter(function (t) { return L(t) === pref && !t.forced; });
+      if (full.length) return (full.filter(function (t) { return t.default; })[0] || full[0]).id;
+    }
+    var forced = tracks.filter(function (t) { return t.forced && L(t) === audioLang; })[0];
+    return forced ? forced.id : null;
+  };
+
   if (typeof document === 'undefined') return; // Node: solo la parte pura
 
   var av = function () { return window.webapis && window.webapis.avplay; };
   var $ = YF.$;
   var P = YF.player = {
     active: false, token: 0, opened: false, preparing: false, wanted: null, closeAfterPrepare: false,
-    opts: null, duration: 0, audio: [], audioPos: 0, subsOn: false, timers: {}
+    opts: null, duration: 0, audio: [], audioPos: 0, timers: {}
   };
 
   function trace(msg) { if (window.console) console.log('[av] ' + msg); }
@@ -107,11 +131,11 @@
       onbufferingstart: function () { if (mine()) setState('Cargando…'); },
       onbufferingprogress: function () {},
       onbufferingcomplete: function () { if (mine()) { setState(''); if (P.waitBuffer) P.waitBuffer(); } },
-      onstreamcompleted: function () { if (mine()) exit(true); },
+      onstreamcompleted: function () { if (mine()) completed(); },
       onerror: function (e) { if (mine()) fail('Error de reproducción: ' + e); },
       onevent: function () {},
       oncurrentplaytime: function () {},
-      onsubtitlechange: function (duration, text) { if (mine() && P.subsOn) showSub(text, duration); }
+      onsubtitlechange: function () {} // silenciado: los subtítulos los dibuja la app
     };
   }
 
@@ -128,8 +152,13 @@
     $('subtitle').classList.add('hidden');
     $('osdTitle').textContent = opts.title;
     $('osdLabel').textContent = opts.label || '';
-    $('osdSubs').textContent = P.subsOn ? 'sí' : 'no';
+    P.subTracks = null; P.subId = null; P.cues = []; P.menu = null; P.nextUp = null;
+    $('subMenu').classList.add('hidden');
+    $('nextUp').classList.add('hidden');
+    $('osdSubs').textContent = 'no';
     $('osdAudio').textContent = '—';
+    $('osdNextKey').classList.toggle('hidden', !(opts.next && opts.next()));
+    loadSubTracks(opts.file.id, token);
     setState('Abriendo…');
     showOsd(true);
     try {
@@ -161,7 +190,9 @@
     if (token !== P.token || P.closeAfterPrepare) return afterCancel();
     try { P.duration = av().getDuration() || P.duration; } catch (_) {}
     readAudio();
-    try { call('setSilentSubtitle', !P.subsOn); } catch (_) {}
+    try { call('setSilentSubtitle', true); } catch (_) {} // AVPlay nunca dibuja: lo hace la app
+    P.audioReady = true;
+    autoPick(token);
     var start = (P.opts.startAt || 0) * 1000;
     var go = function () {
       var release = queue.block(); // ⏩ durante el arranque se acumula y se aplica al empezar
@@ -199,22 +230,119 @@
     flash('Audio: ' + t.lang);
   }
 
-  function toggleSubs() {
-    P.subsOn = !P.subsOn;
-    try { call('setSilentSubtitle', !P.subsOn); } catch (_) {}
-    if (!P.subsOn) $('subtitle').classList.add('hidden');
-    $('osdSubs').textContent = P.subsOn ? 'sí' : 'no';
-    var subs = (P.opts.file.subtitles || []).filter(function (s) { return s.text; });
-    flash(P.subsOn ? (subs.length ? 'Subtítulos activados' : 'Este archivo no trae subtítulos de texto') : 'Subtítulos desactivados');
+  // ---------- Subtítulos: los extrae el servidor y los dibuja la app según el tiempo ----------
+  function loadSubTracks(fileId, token) {
+    P.audioReady = false;
+    YF.api.get('/files/' + encodeURIComponent(fileId) + '/subtitles').then(function (r) {
+      if (token !== P.token) return;
+      P.subTracks = r.tracks || [];
+      P.subImages = r.imageTracks || 0;
+      autoPick(token);
+    }, function () { if (token === P.token) P.subTracks = []; });
   }
 
-  var subTimer = 0;
-  function showSub(text, duration) {
-    var s = $('subtitle');
-    s.textContent = String(text).replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '');
+  // Cuando se conocen el audio y las pistas, aplicar la preferencia guardada.
+  function autoPick(token) {
+    if (token !== P.token || !P.subTracks || !P.audioReady || P.subId) return;
+    var audio = P.audio.length ? P.audio[P.audioPos].lang : '';
+    var id = YF.pickSubtitle(P.subTracks, YF.storage.get('subPref', null), audio);
+    if (id) selectSub(id, true);
+  }
+
+  function trackById(id) { return (P.subTracks || []).filter(function (t) { return t.id === id; })[0]; }
+
+  function selectSub(id, quiet) {
+    var token = P.token;
+    P.subId = id; P.cues = [];
+    $('subtitle').classList.add('hidden');
+    clearInterval(P.timers.sub);
+    var t = trackById(id);
+    $('osdSubs').textContent = t ? t.label : 'no';
+    if (!t) return;
+    if (!quiet) flash('Cargando subtítulos…');
+    // La primera vez el servidor lee el vídeo entero con ffmpeg: margen amplio.
+    YF.api.get('/files/' + encodeURIComponent(P.opts.file.id) + '/subtitles/' + encodeURIComponent(id), 180000).then(function (cues) {
+      if (token !== P.token || P.subId !== id) return;
+      P.cues = cues || [];
+      P.timers.sub = setInterval(drawSub, 200);
+      if (!quiet) flash('Subtítulos: ' + t.label);
+    }, function () { if (token === P.token && P.subId === id) { flash('No se pudieron cargar los subtítulos'); P.subId = null; $('osdSubs').textContent = 'no'; } });
+  }
+
+  var lastCue = null;
+  function drawSub() {
+    var c = YF.cueAt(P.cues, now() / 1000), s = $('subtitle');
+    if (c === lastCue) return;
+    lastCue = c;
+    if (!c) { s.classList.add('hidden'); return; }
+    s.textContent = c[2];
     s.classList.remove('hidden');
-    clearTimeout(subTimer);
-    subTimer = setTimeout(function () { s.classList.add('hidden'); }, Math.max(800, duration || 2500));
+  }
+
+  function openSubMenu() {
+    if (!P.subTracks) { flash('Buscando subtítulos…'); return; }
+    var items = [{ id: null, label: 'Desactivados' }].concat(P.subTracks);
+    var sel = 0;
+    items.forEach(function (it, i) { if (it.id === P.subId) sel = i; });
+    P.menu = { items: items, sel: sel };
+    drawMenu();
+    $('subMenu').classList.remove('hidden');
+    showOsd(true);
+  }
+
+  function drawMenu() {
+    var list = YF.clear($('subMenuList'));
+    P.menu.items.forEach(function (it, i) {
+      var e = YF.el('div', 'sub-item' + (i === P.menu.sel ? ' sel' : '') + (it.id === P.subId ? ' on' : ''), it.label);
+      list.appendChild(e);
+    });
+    if (!P.subTracks.length) list.appendChild(YF.el('p', '', P.subImages ? 'Este archivo solo trae subtítulos en imagen (PGS), que la tele no puede mostrar.' : 'Este archivo no trae subtítulos.'));
+  }
+
+  function menuKey(k) {
+    var m = P.menu;
+    if (k === 'Up') m.sel = Math.max(0, m.sel - 1);
+    else if (k === 'Down') m.sel = Math.min(m.items.length - 1, m.sel + 1);
+    else if (k === 'Enter') {
+      var it = m.items[m.sel];
+      closeMenu();
+      if (!it.id) { selectSub(null); YF.storage.set('subPref', 'off'); flash('Subtítulos desactivados'); }
+      else { if (!it.forced) YF.storage.set('subPref', YF.lang(it.language)); selectSub(it.id); }
+      return;
+    } else if (k === 'Back' || k === 'Yellow') { closeMenu(); return; }
+    drawMenu();
+  }
+
+  function closeMenu() { P.menu = null; $('subMenu').classList.add('hidden'); showOsd(); }
+
+  // ---------- Siguiente capítulo ----------
+  function completed() {
+    var next = P.opts.next && P.opts.next();
+    if (!next) return exit(true);
+    YF.api.progress(P.opts.file.id, P.duration / 1000, P.duration / 1000); // visto
+    stopTimers();
+    $('subtitle').classList.add('hidden');
+    var left = 10;
+    P.nextUp = next;
+    $('nextUpTitle').textContent = next.label;
+    $('nextUpCount').textContent = 'Empieza en ' + left + ' s';
+    $('nextUp').classList.remove('hidden');
+    showOsd(true);
+    P.timers.next = setInterval(function () {
+      left--;
+      $('nextUpCount').textContent = 'Empieza en ' + left + ' s';
+      if (left <= 0) playNext();
+    }, 1000);
+  }
+
+  function playNext() {
+    clearInterval(P.timers.next);
+    var next = P.nextUp || (P.opts.next && P.opts.next());
+    if (!next) return;
+    if (!P.nextUp) saveProgress(); // salto manual con el azul: guardar por dónde iba
+    P.nextUp = null;
+    $('nextUp').classList.add('hidden');
+    P.play(next);
   }
 
   function jump(deltaMs) {
@@ -244,7 +372,7 @@
     P.timers.save = setInterval(saveProgress, 15000);
     tick();
   }
-  function stopTimers() { clearInterval(P.timers.tick); clearInterval(P.timers.save); clearTimeout(P.timers.osd); }
+  function stopTimers() { clearInterval(P.timers.tick); clearInterval(P.timers.save); clearTimeout(P.timers.osd); clearInterval(P.timers.sub); clearInterval(P.timers.next); }
 
   function tick() {
     var t = now(), d = P.duration;
@@ -288,7 +416,9 @@
     var saved = opts && (pos > 5 || completed) ? YF.api.progress(opts.file.id, pos, dur) : Promise.resolve();
     stopTimers();
     nativeClose();
-    P.active = false;
+    P.active = false; P.menu = null; P.nextUp = null;
+    $('subMenu').classList.add('hidden');
+    $('nextUp').classList.add('hidden');
     $('player').classList.add('hidden');
     document.documentElement.classList.remove('video-mode');
     if (YF.app && YF.app.markDirty) YF.app.markDirty();
@@ -299,6 +429,12 @@
   // Teclas durante la reproducción. Devuelve true si la ha usado.
   P.key = function (k) {
     if (!P.active) return false;
+    if (P.menu) { menuKey(k); return true; }
+    if (P.nextUp) {
+      if (k === 'Enter' || k === 'Play' || k === 'PlayPause') playNext();
+      else if (k === 'Back' || k === 'Stop') { clearInterval(P.timers.next); P.nextUp = null; exit(true); }
+      return true;
+    }
     switch (k) {
       case 'Back': case 'Stop': exit(false); break;
       case 'Enter': case 'PlayPause': case 'Play': case 'Pause': togglePause(); break;
@@ -307,7 +443,8 @@
       case 'Rewind': jump(-30000); break;
       case 'FastForward': jump(30000); break;
       case 'Green': nextAudio(); break;
-      case 'Yellow': toggleSubs(); break;
+      case 'Yellow': openSubMenu(); break;
+      case 'Blue': if (P.opts.next && P.opts.next()) playNext(); else flash('No hay capítulo siguiente'); break;
       default: showOsd();
     }
     return true;

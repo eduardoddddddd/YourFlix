@@ -13,7 +13,7 @@
 
   <div id="app">
     <nav id="menu">
-      <div class="brand"><img src="icon.png" alt=""><span>Your<b>Flix</b></span></div>
+      <div class="brand"><img src="logo.png" alt=""><span>Your<b>Flix</b></span></div>
       <div class="menu-items">
         <div class="f menu-item" data-go="home">Inicio</div>
         <div class="f menu-item" data-go="movies">Películas</div>
@@ -31,9 +31,11 @@
       <div class="osd-top"><span id="osdTitle"></span><span id="osdLabel"></span></div>
       <div class="osd-bar"><span id="osdBuffer"></span><span id="osdProgress"></span><span id="osdSeek"></span></div>
       <div class="osd-row"><span id="osdTime"></span><span id="osdState"></span><span id="osdDuration"></span></div>
-      <div class="osd-keys">OK pausa · ◀ ▶ 10 s · ⏪ ⏩ 30 s · <b class="green">Verde</b> audio: <span id="osdAudio">—</span> · <b class="yellow">Amarillo</b> subtítulos: <span id="osdSubs">no</span> · Atrás salir</div>
+      <div class="osd-keys">OK pausa · ◀ ▶ 10 s · ⏪ ⏩ 30 s · <b class="green">Verde</b> audio: <span id="osdAudio">—</span> · <b class="yellow">Amarillo</b> subtítulos: <span id="osdSubs">no</span><span id="osdNextKey" class="hidden"> · <b class="blue">Azul</b> siguiente</span> · Atrás salir</div>
     </div>
     <div id="subtitle" class="hidden"></div>
+    <div id="subMenu" class="hidden"><h3>Subtítulos</h3><div id="subMenuList"></div><p>▲▼ elegir · OK aplicar · Atrás cerrar</p></div>
+    <div id="nextUp" class="hidden"><span class="eyebrow">A continuación</span><h3 id="nextUpTitle"></h3><p id="nextUpCount"></p><p class="hint">OK ver ahora · Atrás salir</p></div>
     <div id="playerMsg" class="hidden"></div>
   </div>
 

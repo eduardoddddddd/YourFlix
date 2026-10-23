@@ -101,6 +101,32 @@ test('cola de saltos: bloqueo durante el arranque', () => {
   assert.deepEqual(calls, [60000], 'liberar dos veces no repite');
 });
 
+test('subtítulos: línea visible por tiempo', () => {
+  const cues = [[1, 2.5, 'uno'], [3, 4, 'dos'], [3.5, 6, 'solapada'], [10, 12, 'tres']];
+  assert.equal(player.cueAt(cues, 0.5), null);
+  assert.equal(player.cueAt(cues, 1.2)[2], 'uno');
+  assert.equal(player.cueAt(cues, 2.7), null, 'hueco entre líneas');
+  assert.equal(player.cueAt(cues, 3.7)[2], 'solapada');
+  assert.equal(player.cueAt(cues, 4.5)[2], 'solapada', 'la anterior ya terminó, la solapada sigue');
+  assert.equal(player.cueAt(cues, 11)[2], 'tres');
+  assert.equal(player.cueAt([], 5), null);
+});
+
+test('subtítulos: preferencia y forzados', () => {
+  player.lang = util.lang; // en la TV, YF es un único objeto
+  const tracks = [
+    { id: 'e3', language: 'spa', forced: true },
+    { id: 'e4', language: 'spa', default: true },
+    { id: 'e5', language: 'eng' },
+  ];
+  assert.equal(player.pickSubtitle(tracks, 'ES', 'EN'), 'e4', 'preferencia ES: la completa, no la forzada');
+  assert.equal(player.pickSubtitle(tracks, 'EN', 'ES'), 'e5');
+  assert.equal(player.pickSubtitle(tracks, null, 'ES'), 'e3', 'audio en español: forzados en español solos');
+  assert.equal(player.pickSubtitle(tracks, 'off', 'ES'), 'e3', 'los forzados se ven aunque estén desactivados');
+  assert.equal(player.pickSubtitle(tracks, 'off', 'EN'), null);
+  assert.equal(player.pickSubtitle(tracks, 'FR', 'EN'), null, 'idioma preferido inexistente');
+});
+
 test('destino de salto: sin pasar del final ni del principio', () => {
   assert.equal(player.seekTarget(55000, 30000, 60000), 55000, 'cinco segundos antes del final (más allá, AVPlay falla)');
   assert.equal(player.seekTarget(5000, -30000, 60000), 0);

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -137,5 +138,25 @@ func TestContinueAndGenres(t *testing.T) {
 	}
 	if w := do(h, "GET", "/api/v1/titles?genre=Western", lan, nil, ""); !strings.Contains(w.Body.String(), `"total":0`) {
 		t.Fatalf("filtro por género vacío: %s", w.Body.String())
+	}
+}
+
+func TestContinueNextEpisode(t *testing.T) {
+	h, db, _ := setup(t)
+	src, _ := db.Sources()
+	db.UpsertTitle(&store.Title{ID: "bear", Kind: "series", Title: "The Bear", MatchSource: "seed", Norm: "the bear"}, false)
+	one, two, three := 1, 2, 3
+	for i, ep := range []*int{&one, &two, &three} {
+		db.SaveFile(&store.File{ID: "e" + strconv.Itoa(i+1), SourceID: src[0].ID, RelPath: "bear" + strconv.Itoa(i) + ".mkv", Fingerprint: "b" + strconv.Itoa(i), Container: "mkv", TitleID: "bear", Season: &one, Episode: ep, Duration: 1800})
+	}
+	do(h, "PUT", "/api/v1/progress/e1", lan, nil, `{"position":1790,"duration":1800}`) // visto (>92 %)
+	w := do(h, "GET", "/api/v1/continue", lan, nil, "")
+	if !strings.Contains(w.Body.String(), `"fileId":"e2"`) || !strings.Contains(w.Body.String(), `"next":true`) || !strings.Contains(w.Body.String(), `"position":0`) {
+		t.Fatalf("tras ver 1×01 debe proponer 1×02 desde el principio: %s", w.Body.String())
+	}
+	do(h, "PUT", "/api/v1/progress/e2", lan, nil, `{"position":1790,"duration":1800}`)
+	do(h, "PUT", "/api/v1/progress/e3", lan, nil, `{"position":1795,"duration":1800}`)
+	if w = do(h, "GET", "/api/v1/continue", lan, nil, ""); strings.Contains(w.Body.String(), `"titleId":"bear"`) {
+		t.Fatalf("serie terminada: no aparece: %s", w.Body.String())
 	}
 }

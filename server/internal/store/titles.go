@@ -335,35 +335,81 @@ func (db *DB) Genres() ([]GenreCount, error) {
 	return out, rows.Err()
 }
 
-// ContinueItem: lo último que se dejó a medias de cada título.
+// ContinueItem: lo último que se dejó a medias de cada título o, en una serie cuyo último
+// capítulo visto se terminó, el siguiente capítulo (Next=true, desde el principio).
 type ContinueItem struct {
 	TitleID   string  `json:"titleId"`
 	FileID    string  `json:"fileId"`
 	Position  float64 `json:"position"`
 	Duration  float64 `json:"duration"`
 	UpdatedAt string  `json:"updatedAt"`
+	Next      bool    `json:"next,omitempty"`
 }
 
 func (db *DB) Continue(limit int) ([]ContinueItem, error) {
-	rows, err := db.Query(`SELECT f.title_id, p.file_id, p.position, p.duration, p.updated_at
-		FROM progress p JOIN files f ON f.id=p.file_id
-		WHERE p.watched=0 AND p.position>=60 AND f.title_id IS NOT NULL AND f.missing_since IS NULL
-		ORDER BY p.updated_at DESC`)
+	rows, err := db.Query(`SELECT f.title_id, p.file_id, p.position, p.duration, p.updated_at, p.watched, t.kind
+		FROM progress p JOIN files f ON f.id=p.file_id JOIN titles t ON t.id=f.title_id
+		WHERE f.missing_since IS NULL AND (p.watched=1 OR p.position>=60)
+		ORDER BY p.updated_at DESC LIMIT 400`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	seen := map[string]bool{}
-	out := []ContinueItem{}
-	for rows.Next() && len(out) < limit {
-		var c ContinueItem
-		if err := rows.Scan(&c.TitleID, &c.FileID, &c.Position, &c.Duration, &c.UpdatedAt); err != nil {
+	type rec struct {
+		ContinueItem
+		watched bool
+		kind    string
+	}
+	var recs []rec
+	for rows.Next() {
+		var r rec
+		var w int
+		if err := rows.Scan(&r.TitleID, &r.FileID, &r.Position, &r.Duration, &r.UpdatedAt, &w, &r.kind); err != nil {
+			rows.Close()
 			return nil, err
 		}
-		if !seen[c.TitleID] {
-			seen[c.TitleID] = true
-			out = append(out, c)
+		r.watched = w != 0
+		recs = append(recs, r)
+	}
+	rows.Close()
+	seen := map[string]bool{}
+	out := []ContinueItem{}
+	for _, r := range recs {
+		if len(out) >= limit {
+			break
+		}
+		if seen[r.TitleID] {
+			continue
+		}
+		seen[r.TitleID] = true // solo cuenta lo más reciente de cada título
+		if !r.watched {
+			out = append(out, r.ContinueItem)
+			continue
+		}
+		if r.kind != "series" {
+			continue // película terminada: fuera de «Seguir viendo»
+		}
+		if next, err := db.nextEpisode(r.TitleID, r.FileID); err == nil && next != nil {
+			out = append(out, ContinueItem{TitleID: r.TitleID, FileID: next.ID, Duration: next.Duration, UpdatedAt: r.UpdatedAt, Next: true})
 		}
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+// nextEpisode: el capítulo siguiente en orden (temporada, capítulo) que no esté visto.
+func (db *DB) nextEpisode(titleID, fileID string) (*File, error) {
+	files, err := db.FilesOfTitle(titleID)
+	if err != nil {
+		return nil, err
+	}
+	for i, f := range files {
+		if f.ID != fileID {
+			continue
+		}
+		for _, n := range files[i+1:] {
+			if p, _ := db.ProgressOf(n.ID); p == nil || !p.Watched {
+				return n, nil
+			}
+		}
+	}
+	return nil, nil
 }

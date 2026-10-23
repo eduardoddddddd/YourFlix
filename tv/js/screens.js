@@ -54,7 +54,7 @@
     art.appendChild(bar);
     card.appendChild(art);
     var label = c.title + (c.season != null ? ' · ' + c.season + '×' + (c.episode < 10 ? '0' : '') + c.episode + (c.episodeName ? ' ' + c.episodeName : '') : '');
-    card.appendChild(el('div', 'cap', label + ' · quedan ' + YF.clock(c.duration - c.position)));
+    card.appendChild(el('div', 'cap', (c.next ? 'Siguiente: ' : '') + label + (c.next ? '' : ' · quedan ' + YF.clock(c.duration - c.position))));
     return YF.f(card, function () {
       api.title(c.titleId).then(function (d) {
         var f = d.files.filter(function (x) { return x.id === c.fileId; })[0];
@@ -213,15 +213,25 @@
 
   function epLabel(f) { return f.season != null ? f.season + '×' + (f.episode < 10 ? '0' : '') + f.episode : ''; }
 
+  function resumeAt(f) { var p = f.progress; return p && !p.watched && p.position > 60 ? p.position : 0; }
+
+  // playOpts: opciones del reproductor; en series, next() da el capítulo siguiente (en cadena).
+  S.playOpts = function (d, f, startAt, onExit) {
+    var files = d.files || [], series = d.title.kind === 'series';
+    return {
+      file: f, title: d.title.title,
+      label: f.season != null ? epLabel(f) + (f.episodeInfo && f.episodeInfo.name ? ' · ' + f.episodeInfo.name : '') : (d.title.year || ''),
+      startAt: startAt || 0, onExit: onExit,
+      next: series ? function () {
+        var n = files[files.indexOf(f) + 1];
+        return n ? S.playOpts(d, n, resumeAt(n), onExit) : null;
+      } : null
+    };
+  };
+
   // play: comprueba compatibilidad, decide si reanudar y lanza el reproductor.
   S.play = function (d, f, startAt, onExit) {
-    var go = function () {
-      YF.player.play({
-        file: f, title: d.title.title,
-        label: f.season != null ? epLabel(f) + (f.episodeInfo && f.episodeInfo.name ? ' · ' + f.episodeInfo.name : '') : (d.title.year || ''),
-        startAt: startAt || 0, onExit: onExit
-      });
-    };
+    var go = function () { YF.player.play(S.playOpts(d, f, startAt, onExit)); };
     if (f.compat.status === 'optimize') {
       YF.dialog('Atención: ' + f.compat.reasons.join('; ') + '. ¿Reproducir igualmente?', [
         { label: 'Reproducir', primary: true, action: go }, { label: 'Cancelar' }]);

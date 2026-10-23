@@ -43,6 +43,13 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**23-10-2026 — fase 3: subtítulos elegibles y siguiente capítulo (app 0.2.0).**
+
+- Hecho: el servidor lista y convierte subtítulos de texto internos y externos (`.srt/.ass/.vtt` junto al vídeo, UTF-8 o Windows-1252), extrae todas las pistas internas de una pasada con ffmpeg y las cachea; la app los dibuja por tiempo (AVPlay nunca toca pistas de texto). Selector con el amarillo; recuerda el idioma; los **forzados** del idioma del audio se activan solos. Al terminar un capítulo, cuenta atrás de 10 s al siguiente (OK ya, Atrás salir); azul = siguiente. «Seguir viendo» propone el siguiente capítulo tras terminar uno. Icono nuevo (`tools/icon/make_icon.py`) y logo del menú.
+- Probado: `go test ./...` (SRT con BOM/CRLF/cp1252, archivos externos, extracción real con ffmpeg); 12 tests de la app; en Chromium con AVPlay simulado: forzados automáticos, menú, cuenta atrás → 1×04, 1×03 visto, «Siguiente: The Bear 1×04». Vídeos de prueba reales en `private/testseries` (1×03 con forzados, 1×04).
+- **Probado en la TV real (0.2.0):** forzados en español activados solos en 1×03 y visibles; al acabar, «A continuación: 1×04 · Los perros» y 1×04 reproduciéndose; en «s6» el menú ofrece Español/Inglés y el inglés se ve. Monitor CDP: 0 cuelgues, 0 excepciones.
+- Pendiente: la primera extracción de subtítulos en discos USB lentos (T7 en el ROG Ally).
+
 **23-10-2026 — fase 2 (app de la tele) instalada en la TV.**
 
 - Hecho: Inicio con héroe que sigue al foco y filas (Seguir viendo, Añadidas, Mejor valoradas, Series, géneros); rejillas de Películas y Series con orden y géneros; ficha (sinopsis, reparto, técnica, avisos de compatibilidad, reanudar, copias); series con temporadas y capítulos (nombre, foto, visto); búsqueda con teclado en pantalla (título, director, reparto); ajustes con IP manual; descubrimiento del servidor (guardado → Mac → barrido de la /24); reproductor con cola de saltos (sin solapes: reanudar, arranque, pausa), cambio de audio, subtítulos de texto, progreso cada 15 s. Servidor: `/continue`, `/genres`, `genre=` y `sort=rating`.

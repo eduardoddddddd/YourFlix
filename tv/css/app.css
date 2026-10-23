@@ -139,7 +139,17 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .osd-row{display:flex;justify-content:space-between;margin-top:14px;font-size:26px;color:#dcdcdc}
 #osdState{color:var(--gold)}
 .osd-keys{margin-top:14px;color:var(--muted);font-size:21px}
-.green{color:#5fd27a;font-weight:400}.yellow{color:#ffd76b;font-weight:400}
+.green{color:#5fd27a;font-weight:400}.yellow{color:#ffd76b;font-weight:400}.blue{color:#6bb0ff;font-weight:400}
+#subMenu{position:absolute;right:90px;bottom:260px;width:560px;padding:26px 30px;background:rgba(9,11,16,.94);border:2px solid var(--gold);border-radius:18px;z-index:3}
+#subMenu h3{font:400 34px Georgia,serif;margin:0 0 16px}
+#subMenu p{color:var(--muted);font-size:20px;margin:14px 0 0}
+.sub-item{padding:12px 18px;border-radius:10px;font-size:26px;color:#dcdcdc}
+.sub-item.on:before{content:"✓ ";color:var(--gold)}
+.sub-item.sel{background:var(--gold);color:#201704}
+#nextUp{position:absolute;right:90px;bottom:90px;width:620px;padding:28px 34px;background:rgba(9,11,16,.94);border:2px solid var(--gold);border-radius:18px;z-index:3}
+#nextUp h3{font:400 38px Georgia,serif;margin:10px 0}
+#nextUp p{font-size:26px;margin:8px 0;color:#dcdcdc}
+#nextUp .hint{color:var(--muted);font-size:21px}
 #subtitle{position:absolute;left:180px;width:1560px;bottom:110px;text-align:center;font-size:48px;line-height:1.25;text-shadow:0 0 8px #000,0 3px 6px #000,0 0 2px #000;white-space:pre-line}
 #osd:not(.off)~#subtitle{bottom:300px}
 #playerMsg{position:absolute;left:560px;top:460px;width:800px;padding:30px;text-align:center;background:rgba(9,11,16,.9);border:2px solid var(--gold);border-radius:18px;font-size:30px}

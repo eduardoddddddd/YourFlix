@@ -19,11 +19,13 @@ import (
 	"github.com/eduardoddddddd/YourFlix/server/internal/images"
 	"github.com/eduardoddddddd/YourFlix/server/internal/probe"
 	"github.com/eduardoddddddd/YourFlix/server/internal/store"
+	"github.com/eduardoddddddd/YourFlix/server/internal/subs"
 )
 
 type Server struct {
 	DB       *store.DB
 	Images   *images.Cache
+	Subs     *subs.Extractor
 	Profile  *compat.Profile
 	Version  string
 	ServerID string
@@ -39,6 +41,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/files/{id}/stream", s.stream)
 	mux.HandleFunc("HEAD /api/v1/files/{id}/stream", s.stream)
 	mux.HandleFunc("GET /api/v1/files/{id}/still", s.still)
+	mux.HandleFunc("GET /api/v1/files/{id}/subtitles", s.subtitles)
+	mux.HandleFunc("GET /api/v1/files/{id}/subtitles/{sid}", s.subtitleCues)
 	mux.HandleFunc("PUT /api/v1/progress/{id}", s.putProgress)
 	mux.HandleFunc("GET /api/v1/sources", s.sources)
 	mux.HandleFunc("GET /api/v1/genres", s.genres)
@@ -391,4 +395,64 @@ func (s *Server) continueWatching(w http.ResponseWriter, r *http.Request) {
 		res = append(res, o)
 	}
 	writeJSON(w, res)
+}
+
+// fileTracks: pistas de texto de un archivo (internas + externas junto al vídeo).
+func (s *Server) fileTracks(id string) (*store.File, string, []subs.Track, int, error) {
+	f, err := s.DB.File(id)
+	if err != nil {
+		return nil, "", nil, 0, err
+	}
+	src, err := s.DB.Source(f.SourceID)
+	if err != nil {
+		return nil, "", nil, 0, err
+	}
+	var emb []probe.Subtitle
+	json.Unmarshal(f.Subs, &emb)
+	images := 0
+	for _, x := range emb {
+		if !x.Text {
+			images++
+		}
+	}
+	path := filepath.Join(src.Path, filepath.FromSlash(f.RelPath))
+	return f, path, subs.Tracks(path, emb), images, nil
+}
+
+func (s *Server) subtitles(w http.ResponseWriter, r *http.Request) {
+	f, _, tracks, images, err := s.fileTracks(r.PathValue("id"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	if f.MissingSince != "" {
+		http.Error(w, "el disco de este archivo no está conectado", http.StatusGone)
+		return
+	}
+	if tracks == nil {
+		tracks = []subs.Track{}
+	}
+	writeJSON(w, map[string]any{"tracks": tracks, "imageTracks": images})
+}
+
+// subtitleCues: [[inicio, fin, texto], …] en segundos. La primera vez extrae con ffmpeg
+// todas las pistas internas de una pasada (en un disco USB puede tardar decenas de segundos).
+func (s *Server) subtitleCues(w http.ResponseWriter, r *http.Request) {
+	f, path, tracks, _, err := s.fileTracks(r.PathValue("id"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	t0 := time.Now()
+	cues, err := s.Subs.Cues(r.Context(), f.ID, f.Fingerprint, path, tracks, r.PathValue("sid"))
+	if err != nil {
+		s.Log.Printf("subtítulos %s/%s: %v", f.ID, r.PathValue("sid"), err)
+		http.Error(w, "no se pudieron preparar los subtítulos", http.StatusUnprocessableEntity)
+		return
+	}
+	if d := time.Since(t0); d > time.Second {
+		s.Log.Printf("subtítulos %s/%s: %d líneas en %s", f.ID, r.PathValue("sid"), len(cues), d.Round(time.Millisecond))
+	}
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	writeJSON(w, cues)
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/eduardoddddddd/YourFlix/server/internal/scan"
 	"github.com/eduardoddddddd/YourFlix/server/internal/seed"
 	"github.com/eduardoddddddd/YourFlix/server/internal/store"
+	"github.com/eduardoddddddd/YourFlix/server/internal/subs"
 	"github.com/eduardoddddddd/YourFlix/server/internal/tmdb"
 )
 
@@ -40,6 +41,7 @@ const version = "0.1.0"
 
 type app struct {
 	dataDir, ffprobe, profile string
+	ffmpeg                    string
 	tmdbTokenFile             string
 	tmdb                      *tmdb.Client
 	db                        *store.DB
@@ -52,6 +54,7 @@ func main() {
 	g.StringVar(&a.dataDir, "data", envOr("YOURFLIX_DATA", "data"), "carpeta de datos (base de datos, imágenes)")
 	g.StringVar(&a.ffprobe, "ffprobe", envOr("YOURFLIX_FFPROBE", ""), "ruta de ffprobe (por defecto: junto al ejecutable o en el PATH)")
 	g.StringVar(&a.profile, "profile", "", "perfil de la TV (por defecto el incrustado)")
+	g.StringVar(&a.ffmpeg, "ffmpeg", envOr("YOURFLIX_FFMPEG", ""), "ruta de ffmpeg, para subtítulos (por defecto: junto al ejecutable o en el PATH)")
 	g.StringVar(&a.tmdbTokenFile, "tmdb-token-file", envOr("YOURFLIX_TMDB_TOKEN_FILE", ""), "fichero con el token de lectura de TMDB (o TMDB_ACCESS_TOKEN / TMDB_API_KEY)")
 	g.Usage = usage
 	g.Parse(os.Args[1:])
@@ -79,7 +82,10 @@ func main() {
 	defer db.Close()
 	a.db = db
 	if a.ffprobe == "" {
-		a.ffprobe = findFFprobe()
+		a.ffprobe = findTool("ffprobe")
+	}
+	if a.ffmpeg == "" {
+		a.ffmpeg = findTool("ffmpeg")
 	}
 	if err := a.setupTMDB(); err != nil {
 		log.Fatal(err)
@@ -133,9 +139,8 @@ func envOr(k, def string) string {
 	return def
 }
 
-// findFFprobe: primero junto al ejecutable (instalación en Windows), luego el PATH.
-func findFFprobe() string {
-	name := "ffprobe"
+// findTool: primero junto al ejecutable (instalación en Windows), luego el PATH.
+func findTool(name string) string {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
@@ -352,7 +357,8 @@ func (a *app) serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	srv := &api.Server{DB: a.db, Images: images.New(filepath.Join(a.dataDir, "images")), Profile: prof, Version: version, ServerID: a.serverID(), Log: log.Default()}
+	srv := &api.Server{DB: a.db, Images: images.New(filepath.Join(a.dataDir, "images")), Subs: &subs.Extractor{FFmpeg: a.ffmpeg, Dir: filepath.Join(a.dataDir, "subs")},
+		Profile: prof, Version: version, ServerID: a.serverID(), Log: log.Default()}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	go a.scanLoop(ctx, *rescan)
