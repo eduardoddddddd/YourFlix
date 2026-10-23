@@ -1,0 +1,8 @@
+secrets/
+private/
+data/
+*.wgt
+.buildResult/
+/bin/
+/dist/
+.DS_Store
