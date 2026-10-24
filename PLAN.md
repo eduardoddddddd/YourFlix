@@ -416,4 +416,11 @@ Transcodificación en vivo (HLS) · varios perfiles de usuario · capítulos MKV
 3. Pasar las **memorias de Codex** con el formato que admite la tele para el perfil de la fase 0.
 4. ¿Qué modelo exacto de Ally (original o Ally X) y si hay dock con Ethernet?
 
+### Peticiones del usuario (24-10-2026), pendientes de plan
+
+5. **Cliente web** para ver la colección desde cualquier navegador (móvil, Mac, PC) en la LAN, sin tocar la app de Tizen. Medido: de 496 archivos, 480 son MKV; solo 53 llevan H.264 de 8 bits con audio que lee un navegador; 214 solo necesitan convertir el audio (AC3/E-AC3/DTS → AAC) y 229 tienen vídeo HEVC/10 bits/XviD. Exige remux en vivo (vídeo copiado y audio a AAC, HLS o fMP4) y, para XviD, recodificar (AMF del Ally). Cambia la regla «sin transcodificación en vivo» (ADR-001): necesita ADR.
+6. **Servidor permanente en el Ally** (servicio de Windows) que sirva la API, la app web y la administración.
+7. **Interfaz de administración** del servidor (es la fase 5).
+8. **Audio y subtítulos en la TV:** hoy solo con los botones de color (verde y amarillo), que el mando Smart Remote de The Serif no tiene a la vista. Hacen falta botones en pantalla en el reproductor.
+
 > **Actualización 24-10-2026:** el trabajo continúa en el propio Ally (Wi-Fi `192.168.1.13` por ahora; cable e IP nueva después). Estado real y relevo: `README.md` («Estado») y `docs/ENTORNO-ALLY.md`.
