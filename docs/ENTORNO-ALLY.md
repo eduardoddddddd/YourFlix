@@ -91,7 +91,7 @@ Sustituye al `serve` lanzado a mano desde el worktree (que se para al cerrar la 
 | `…\ffmpeg.exe`, `…\ffprobe.exe` | Copias de ffmpeg 9.0.2 (gyan): la tarea corre como SYSTEM, que no ve el PATH del usuario |
 | `…\secrets\tmdb.token` | Token de TMDB (fuera de Git) |
 | `…\data\` | `yourflix.db`, `images\`, `subs\` y `yourflix.log` (se rota a `yourflix.old.log` al pasar de 10 MB) |
-| `…\iniciar.cmd`, `parar.cmd`, `instalar-servicio.ps1` | Copias de `tools/ally/` |
+| `…\iniciar.cmd`, `parar.cmd`, `instalar.cmd`, `instalar-servicio.ps1` | Copias de `tools/ally/`. `instalar.cmd` (doble clic en el Ally) pide permiso de administrador y lanza el `.ps1`, que deja su resultado en `instalar.log` |
 
 - **Arranque:** tarea programada «YourFlix» al encender, como SYSTEM y sin iniciar sesión. `iniciar.cmd` relanza el servidor a los 10 s si se cae. La crea `instalar-servicio.ps1`, que **ejecuta el usuario como administrador** porque cambia la configuración de Windows: tarea, regla de firewall «YourFlix (TCP 8787)» solo para ese ejecutable (perfiles Privado y Público, porque la Wi-Fi del Ally está como Pública) y energía con cargador sin suspensión ni hibernación.
 - **Parar o arrancar a mano** (como administrador): `C:\YourFlix\servidor\parar.cmd` y `schtasks /run /tn YourFlix`.
