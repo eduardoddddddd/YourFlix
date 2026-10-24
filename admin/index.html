@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>YourFlix · Administración</title>
+  <link rel="icon" href="logo.png">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header id="top">
+    <a class="brand" href="#fuentes"><img src="logo.png" alt=""><span>Your<b>Flix</b></span><small>Administración</small></a>
+    <nav id="tabs" class="hidden">
+      <a href="#fuentes" data-view="fuentes">Fuentes</a>
+      <a href="#catalogo" data-view="catalogo">Catálogo<span id="pendingCount" class="count hidden"></span></a>
+      <a href="#compatibilidad" data-view="compatibilidad">Compatibilidad</a>
+      <a href="#estado" data-view="estado">Estado</a>
+    </nav>
+    <div id="who"></div>
+  </header>
+
+  <main id="main"><p class="loading">Cargando…</p></main>
+
+  <aside id="jobs" class="hidden" aria-live="polite"></aside>
+  <div id="toast" class="hidden" role="status"></div>
+  <div id="modal" class="hidden" role="dialog" aria-modal="true"><div class="modal-card" id="modalCard"></div></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
