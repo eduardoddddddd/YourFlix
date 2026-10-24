@@ -46,7 +46,7 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 **24-10-2026 — S10: servidor en el ROG Ally, probado en la TV real.** Detalle en [docs/PRUEBAS-TV.md](docs/PRUEBAS-TV.md#s10--servidor-en-el-rog-ally-probado-en-la-tv-24-10-2026).
 
 - **Probado en la TV** (app 0.2.0 sin reinstalar, lanzada desde el Mac con inspector y monitor CDP: 0 cuelgues, 0 excepciones): la app descubre el Ally (`192.168.1.13`) **sola en 1,14 s**, porque la IP del Mac falla al momento y el barrido de la /24 lo encuentra en la primera tanda. No hizo falta guardar la IP a mano. Caudal Wi-Fi Ally → TV: **90–103 Mb/s**. Akira (H.264), Barry Lyndon (HEVC 10 bits) y The Punisher: One Last Kill (**4K HEVC 10 bits, 14,8 Mb/s**): apertura en 0,8–1,5 s, salto al 50 % en 0,3–0,4 s, ±30 s, pausa y reanudación (0,31 s) y salida limpia. Un solo parón de más de 1 s, en el 4K, justo después de −30 s.
-- La ping desde otro equipo de la LAN queda comprobada: la TV llega a `:8787` con el firewall que aceptó el usuario.
+- El ping desde otro equipo de la LAN queda comprobado: la TV llega a `:8787` con el firewall que aceptó el usuario.
 - Pendiente: HDR a ojo, DTS → E-AC3 (fase 4), subtítulos extraídos desde el T7 en el Ally, servicio de Windows (fase 5). La dirección de fábrica de la app sigue siendo la del Mac: no hace falta cambiarla mientras el barrido tarde ~1 s, pero hay que actualizarla cuando el Ally pase a cable.
 - Siguiente paso: fase 4 o la refactorización que plantee el usuario.
 
