@@ -333,6 +333,7 @@ Contra el servidor simulado: `nav.js`, `api.js`, Inicio, rejillas, Ficha, Serie,
 
 `compat` con el perfil, distintivos en ficha, `optimize` con cola (DTS → E-AC3 conservando vídeo; XviD → H.264 si G0 lo pide), extracción ASS → texto, OCR de PGS como paso opcional documentado (herramienta externa, no obligatoria). La copia optimizada hereda ficha y progreso.
 **Hecho cuando** los 9 DTS se reproducen con sonido tras optimizar y ningún archivo «optimizar» puede colgar la app (se avisa antes de abrirlo).
+> **24-10-2026:** el usuario descarta la conversión DTS → E-AC3 (9 archivos, no le preocupan). La app 0.3.0 pasa sola a otra pista si la DTS es la de por defecto y avisa si solo hay DTS.
 
 ### Fase 5 ∥ — Admin web y despliegue en Windows · *Sonnet* (+ *Haiku* para textos/guías)
 

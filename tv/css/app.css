@@ -139,6 +139,11 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .osd-row{display:flex;justify-content:space-between;margin-top:14px;font-size:26px;color:#dcdcdc}
 #osdState{color:var(--gold)}
 .osd-keys{margin-top:14px;color:var(--muted);font-size:21px}
+.osd-btns{margin-top:18px}
+.obtn{display:inline-block;padding:10px 24px;margin-right:14px;border-radius:10px;background:rgba(255,255,255,.12);font-size:24px;border:3px solid transparent;color:#dcdcdc}
+.obtn b{font-weight:400;color:var(--text)}
+.obtn.focused{background:#fff;color:#111;border-color:#fff}
+.obtn.focused b{color:#111}
 .green{color:#5fd27a;font-weight:400}.yellow{color:#ffd76b;font-weight:400}.blue{color:#6bb0ff;font-weight:400}
 #subMenu{position:absolute;right:90px;bottom:260px;width:560px;padding:26px 30px;background:rgba(9,11,16,.94);border:2px solid var(--gold);border-radius:18px;z-index:3}
 #subMenu h3{font:400 34px Georgia,serif;margin:0 0 16px}

@@ -69,13 +69,25 @@
     return forced ? forced.id : null;
   };
 
+  // audioStart: posición (en las pistas que lista AVPlay) que hay que elegir a mano al empezar, o -1.
+  // AVPlay descarta las pistas DTS sin avisar: si la pista por defecto del archivo es DTS, la tele
+  // se queda muda aunque el archivo traiga otra pista compatible.
+  YF.audioStart = function (fileAudio, avTracks) {
+    var dts = function (c) { return /dts|dca/i.test(c || ''); };
+    fileAudio = fileAudio || [];
+    var def = fileAudio.filter(function (a) { return a.default; })[0] || fileAudio[0];
+    if (!def || !dts(def.codec)) return -1;
+    for (var i = 0; i < avTracks.length; i++) if (!dts(avTracks[i].codec)) return i;
+    return -1;
+  };
+
   if (typeof document === 'undefined') return; // Node: solo la parte pura
 
   var av = function () { return window.webapis && window.webapis.avplay; };
   var $ = YF.$;
   var P = YF.player = {
     active: false, token: 0, opened: false, preparing: false, wanted: null, closeAfterPrepare: false,
-    opts: null, duration: 0, audio: [], audioPos: 0, timers: {}
+    opts: null, duration: 0, audio: [], audioPos: 0, btn: -1, timers: {}
   };
 
   function trace(msg) { if (window.console) console.log('[av] ' + msg); }
@@ -158,6 +170,8 @@
     $('osdSubs').textContent = 'no';
     $('osdAudio').textContent = '—';
     $('osdNextKey').classList.toggle('hidden', !(opts.next && opts.next()));
+    markBtn(-1);
+    P.notice = '';
     loadSubTracks(opts.file.id, token);
     setState('Abriendo…');
     showOsd(true);
@@ -190,6 +204,9 @@
     if (token !== P.token || P.closeAfterPrepare) return afterCancel();
     try { P.duration = av().getDuration() || P.duration; } catch (_) {}
     readAudio();
+    var fix = YF.audioStart(P.opts.file.audio, P.audio);
+    if (fix >= 0) selectAudio(fix, true);
+    if (!P.audio.length && P.opts.file.audio && P.opts.file.audio.length) P.notice = noAudioText();
     try { call('setSilentSubtitle', true); } catch (_) {} // AVPlay nunca dibuja: lo hace la app
     P.audioReady = true;
     autoPick(token);
@@ -199,6 +216,7 @@
       try { call('play'); } catch (e) { release(); return fail(e.message); }
       waitResume(release);
       setState(''); startTimers(); showOsd();
+      if (P.notice) setTimeout(function () { if (token === P.token) flash(P.notice); }, 1500);
     };
     if (start > 10000 && start < P.duration - 10000) {
       // Por la cola: si el usuario pulsa ⏩ mientras tanto, se encola en vez de solaparse.
@@ -213,21 +231,75 @@
     P.audio = [];
     for (var i = 0; i < all.length; i++) {
       if (all[i].type !== 'AUDIO') continue;
-      var lang = '';
-      try { lang = JSON.parse(all[i].extra_info).language; } catch (_) {}
-      P.audio.push({ index: all[i].index, lang: YF.lang(lang) });
+      var x = {};
+      try { x = JSON.parse(all[i].extra_info) || {}; } catch (_) {}
+      var ch = parseInt(x.channels, 10), codec = String(x.fourCC || '');
+      var label = YF.lang(x.language) + (ch === 8 ? ' 7.1' : ch === 6 ? ' 5.1' : ch === 2 ? ' estéreo' : ch === 1 ? ' mono' : '') + (codec ? ' · ' + codec.toUpperCase() : '');
+      P.audio.push({ index: all[i].index, lang: YF.lang(x.language), codec: codec, label: label });
     }
-    $('osdAudio').textContent = P.audio.length ? P.audio[0].lang + (P.audio.length > 1 ? ' (1/' + P.audio.length + ')' : '') : '—';
+    showAudio();
+  }
+
+  function showAudio() {
+    var n = P.audio.length;
+    $('osdAudio').textContent = n ? P.audio[P.audioPos].label + (n > 1 ? ' (' + (P.audioPos + 1) + '/' + n + ')' : '') : '—';
+  }
+
+  function noAudioText() {
+    var a = (P.opts && P.opts.file.audio) || [];
+    if (!a.length) return 'Este archivo no tiene audio';
+    return a.every(function (x) { return /dts|dca/i.test(x.codec); }) ? 'Sin sonido: el audio es DTS y la tele no lo reproduce' : 'La tele no encuentra un audio que pueda reproducir';
+  }
+
+  function selectAudio(i, quiet) {
+    var t = P.audio[i];
+    if (!t) return;
+    if (P.preparing || queue.busy) { if (!quiet) flash('Un momento, está cargando'); return; } // AVPlay: una operación cada vez
+    try { call('setSelectTrack', 'AUDIO', t.index); } catch (e) { flash('No se pudo cambiar el audio'); return; }
+    P.audioPos = i;
+    showAudio();
+    if (!quiet) flash('Audio: ' + t.label);
   }
 
   function nextAudio() {
-    if (P.preparing || queue.busy) return;
-    if (P.audio.length < 2) { flash('Solo hay una pista de audio'); return; }
-    P.audioPos = (P.audioPos + 1) % P.audio.length;
-    var t = P.audio[P.audioPos];
-    try { call('setSelectTrack', 'AUDIO', t.index); } catch (e) { flash('No se pudo cambiar el audio'); return; }
-    $('osdAudio').textContent = t.lang + ' (' + (P.audioPos + 1) + '/' + P.audio.length + ')';
-    flash('Audio: ' + t.lang);
+    if (P.audio.length < 2) { flash(P.audio.length ? 'Solo hay una pista de audio' : noAudioText()); return; }
+    selectAudio((P.audioPos + 1) % P.audio.length);
+  }
+
+  function openAudioMenu() {
+    if (!P.audio.length) { flash(noAudioText()); return; }
+    P.menu = { kind: 'audio', items: P.audio, sel: P.audioPos };
+    $('menuTitle').textContent = 'Audio';
+    drawMenu();
+    $('subMenu').classList.remove('hidden');
+    showOsd(true);
+  }
+
+  // ---------- Botones del reproductor (▼ desde el vídeo): el mando de The Serif no tiene botones de color ----------
+  var BTNS = ['btnAudio', 'btnSubs', 'osdNextKey'];
+  function osdButtons() { return BTNS.map(function (id) { return $(id); }).filter(function (b) { return !b.classList.contains('hidden'); }); }
+
+  function markBtn(i) {
+    var bs = osdButtons();
+    P.btn = i < 0 || !bs.length ? -1 : Math.max(0, Math.min(bs.length - 1, i));
+    BTNS.forEach(function (id) { $(id).classList.remove('focused'); });
+    if (P.btn >= 0) bs[P.btn].classList.add('focused');
+  }
+
+  function focusBtn(i) { markBtn(i); showOsd(P.btn >= 0); }
+
+  function btnKey(k) {
+    if (k === 'Left') focusBtn(P.btn - 1);
+    else if (k === 'Right') focusBtn(P.btn + 1);
+    else if (k === 'Up' || k === 'Back') focusBtn(-1);
+    else if (k === 'Down') showOsd(true);
+    else if (k === 'Enter') {
+      var id = osdButtons()[P.btn].id;
+      if (id === 'btnAudio') openAudioMenu();
+      else if (id === 'btnSubs') openSubMenu();
+      else playNext();
+    } else return false;
+    return true;
   }
 
   // ---------- Subtítulos: los extrae el servidor y los dibuja la app según el tiempo ----------
@@ -284,19 +356,20 @@
     var items = [{ id: null, label: 'Desactivados' }].concat(P.subTracks);
     var sel = 0;
     items.forEach(function (it, i) { if (it.id === P.subId) sel = i; });
-    P.menu = { items: items, sel: sel };
+    P.menu = { kind: 'subs', items: items, sel: sel };
+    $('menuTitle').textContent = 'Subtítulos';
     drawMenu();
     $('subMenu').classList.remove('hidden');
     showOsd(true);
   }
 
   function drawMenu() {
-    var list = YF.clear($('subMenuList'));
-    P.menu.items.forEach(function (it, i) {
-      var e = YF.el('div', 'sub-item' + (i === P.menu.sel ? ' sel' : '') + (it.id === P.subId ? ' on' : ''), it.label);
-      list.appendChild(e);
+    var m = P.menu, list = YF.clear($('subMenuList'));
+    m.items.forEach(function (it, i) {
+      var on = m.kind === 'audio' ? i === P.audioPos : it.id === P.subId;
+      list.appendChild(YF.el('div', 'sub-item' + (i === m.sel ? ' sel' : '') + (on ? ' on' : ''), it.label));
     });
-    if (!P.subTracks.length) list.appendChild(YF.el('p', '', P.subImages ? 'Este archivo solo trae subtítulos en imagen (PGS), que la tele no puede mostrar.' : 'Este archivo no trae subtítulos.'));
+    if (m.kind === 'subs' && !P.subTracks.length) list.appendChild(YF.el('p', '', P.subImages ? 'Este archivo solo trae subtítulos en imagen (PGS), que la tele no puede mostrar.' : 'Este archivo no trae subtítulos.'));
   }
 
   function menuKey(k) {
@@ -306,14 +379,15 @@
     else if (k === 'Enter') {
       var it = m.items[m.sel];
       closeMenu();
+      if (m.kind === 'audio') { selectAudio(m.sel); return; }
       if (!it.id) { selectSub(null); YF.storage.set('subPref', 'off'); flash('Subtítulos desactivados'); }
       else { if (!it.forced) YF.storage.set('subPref', YF.lang(it.language)); selectSub(it.id); }
       return;
-    } else if (k === 'Back' || k === 'Yellow') { closeMenu(); return; }
+    } else if (k === 'Back' || k === 'Yellow' || k === 'Green') { closeMenu(); return; }
     drawMenu();
   }
 
-  function closeMenu() { P.menu = null; $('subMenu').classList.add('hidden'); showOsd(); }
+  function closeMenu() { P.menu = null; $('subMenu').classList.add('hidden'); showOsd(P.btn >= 0); }
 
   // ---------- Siguiente capítulo ----------
   function completed() {
@@ -395,7 +469,7 @@
     var o = $('osd');
     o.classList.remove('off');
     clearTimeout(P.timers.osd);
-    if (!stay) P.timers.osd = setTimeout(function () { if (state() === 'PLAYING' && !queue.busy) o.classList.add('off'); }, 4000);
+    if (!stay && P.btn < 0 && !P.menu) P.timers.osd = setTimeout(function () { if (state() === 'PLAYING' && !queue.busy) o.classList.add('off'); }, 4000);
   }
 
   function flash(text) { setState(text); showOsd(); }
@@ -417,6 +491,7 @@
     stopTimers();
     nativeClose();
     P.active = false; P.menu = null; P.nextUp = null;
+    markBtn(-1);
     $('subMenu').classList.add('hidden');
     $('nextUp').classList.add('hidden');
     $('player').classList.add('hidden');
@@ -435,7 +510,9 @@
       else if (k === 'Back' || k === 'Stop') { clearInterval(P.timers.next); P.nextUp = null; exit(true); }
       return true;
     }
+    if (P.btn >= 0 && btnKey(k)) return true;
     switch (k) {
+      case 'Down': focusBtn(0); break;
       case 'Back': case 'Stop': exit(false); break;
       case 'Enter': case 'PlayPause': case 'Play': case 'Pause': togglePause(); break;
       case 'Left': jump(-10000); break;

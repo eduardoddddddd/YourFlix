@@ -127,6 +127,16 @@ test('subtítulos: preferencia y forzados', () => {
   assert.equal(player.pickSubtitle(tracks, 'FR', 'EN'), null, 'idioma preferido inexistente');
 });
 
+test('audio: si la pista por defecto es DTS, pasar a una que suene', () => {
+  // «Alien contra Predator»: DTS español por defecto + AC3 inglés. AVPlay solo lista la AC3.
+  const file = [{ codec: 'dts', default: true }, { codec: 'ac3' }];
+  assert.equal(player.audioStart(file, [{ index: 2, codec: 'AC3' }]), 0);
+  assert.equal(player.audioStart(file, [{ index: 1, codec: 'DTS' }, { index: 2, codec: 'AC3' }]), 1, 'si AVPlay la listara, saltarla');
+  assert.equal(player.audioStart([{ codec: 'dts' }], []), -1, 'solo DTS: no hay nada que elegir');
+  assert.equal(player.audioStart([{ codec: 'ac3', default: true }, { codec: 'dts' }], [{ index: 1, codec: 'AC3' }]), -1, 'por defecto compatible: no tocar');
+  assert.equal(player.audioStart([], []), -1);
+});
+
 test('destino de salto: sin pasar del final ni del principio', () => {
   assert.equal(player.seekTarget(55000, 30000, 60000), 55000, 'cinco segundos antes del final (más allá, AVPlay falla)');
   assert.equal(player.seekTarget(5000, -30000, 60000), 0);

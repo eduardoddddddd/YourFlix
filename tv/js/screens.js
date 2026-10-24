@@ -269,7 +269,7 @@
     function techBlock(box, f) {
       var b = el('div', 'badges');
       YF.techBadges(f).forEach(function (x, i) { b.appendChild(el('span', 'badge' + (i === 0 ? ' gold' : ''), x)); });
-      b.appendChild(el('span', 'badge', f.source + ' · ' + YF.bytes(f.size)));
+      b.appendChild(el('span', 'badge', YF.bytes(f.size)));
       box.appendChild(b);
       if (f.compat.status !== 'direct') box.appendChild(el('div', 'warn' + (f.compat.status === 'optimize' ? ' bad' : ''), '⚠ ' + f.compat.reasons.join(' · ')));
     }
@@ -285,7 +285,7 @@
       var main = YF.f(el('span', 'btn primary', resume ? '▶ Reanudar desde ' + YF.clock(pr.position) : '▶ Reproducir'), function () { S.play(d, f, resume ? pr.position : 0, onExit); });
       btns.appendChild(main);
       if (resume) btns.appendChild(YF.f(el('span', 'btn', '↺ Desde el principio'), function () { S.play(d, f, 0, onExit); }));
-      if (files.length > 1) btns.appendChild(YF.f(el('span', 'btn', 'Copia ' + (copyIdx + 1) + '/' + files.length + ': ' + f.source + ' ⟳'), function () { copyIdx = (copyIdx + 1) % files.length; var fresh = render(d); YF.nav.focus(s.el.querySelectorAll('.btn')[s.el.querySelectorAll('.btn').length - 1] || fresh); }));
+      if (files.length > 1) btns.appendChild(YF.f(el('span', 'btn', 'Copia ' + (copyIdx + 1) + '/' + files.length + ' ⟳'), function () { copyIdx = (copyIdx + 1) % files.length; var fresh = render(d); YF.nav.focus(s.el.querySelectorAll('.btn')[s.el.querySelectorAll('.btn').length - 1] || fresh); }));
       box.appendChild(btns);
       return main;
     }
@@ -376,7 +376,7 @@
       btns.appendChild(again);
       btns.appendChild(YF.f(el('span', 'btn', 'Escribir dirección IP'), function () { S.ipDialog(); }));
       box.appendChild(btns);
-      box.appendChild(el('p', '', 'Mando: flechas para moverse, OK para elegir, Atrás para volver. En el vídeo: ◀ ▶ 10 s, ⏪ ⏩ 30 s, verde audio, amarillo subtítulos.'));
+      box.appendChild(el('p', '', 'Mando: flechas para moverse, OK para elegir, Atrás para volver. En el vídeo: ◀ ▶ 10 s, ⏪ ⏩ 30 s, ▼ botones de audio y subtítulos (o verde y amarillo).'));
       return Promise.resolve(again);
     };
     return s;
