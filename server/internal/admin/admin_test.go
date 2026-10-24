@@ -56,6 +56,14 @@ func fakeTMDB(t *testing.T) *httptest.Server {
 				out = []res{{"id": 78, "title": "Blade Runner", "original_title": "Blade Runner", "release_date": "1982-06-25", "vote_count": 14000, "poster_path": "/p.jpg"}}
 			}
 			json.NewEncoder(w).Encode(res{"results": out})
+		case "/search/tv":
+			var out []res
+			if parse.Normalize(r.URL.Query().Get("query")) == "andor" {
+				out = []res{{"id": 83867, "name": "Andor", "original_name": "Andor", "first_air_date": "2022-09-21", "vote_count": 1500}}
+			}
+			json.NewEncoder(w).Encode(res{"results": out})
+		case "/tv/83867":
+			json.NewEncoder(w).Encode(res{"id": 83867, "name": "Andor", "original_name": "Andor", "first_air_date": "2022-09-21", "overview": "Cassian Andor."})
 		case "/movie/78":
 			json.NewEncoder(w).Encode(res{"id": 78, "title": "Blade Runner", "original_title": "Blade Runner", "release_date": "1982-06-25", "overview": "Los Ángeles, 2019.", "poster_path": "/p.jpg"})
 		default:
@@ -565,6 +573,19 @@ func TestPendingMatchAndNoTokenLeak(t *testing.T) {
 	}
 	if p := decode[struct{ Items []pendingOut }](t, keep(mc.do("GET", "/admin/api/pending", nil))); len(p.Items) != 0 {
 		t.Fatalf("ya no está pendiente: %+v", p)
+	}
+	// Un resultado de serie elegido para una ficha de película: se usa el tipo elegido
+	// (los IDs de películas y series de TMDB no son el mismo espacio).
+	e.db.UpsertTitle(&store.Title{ID: "y", Kind: "movie", Title: "andor s1", MatchSource: "filename", Norm: "andor s1"}, false)
+	e.db.SaveFile(&store.File{ID: "f-y", SourceID: src.ID, RelPath: "andor.mkv", Fingerprint: "y", TitleID: "y", MatchSource: "filename"})
+	if w := keep(mc.do("POST", "/admin/api/titles/y/match", map[string]any{"tmdb": 83867, "kind": "series"})); w.Code != 200 {
+		t.Fatalf("emparejar serie: %d %s", w.Code, w.Body.String())
+	}
+	if y, _ := e.db.Title("y"); y.Kind != "series" || y.TMDB != 83867 || y.Title != "Andor" || !y.Locked {
+		t.Fatalf("debe pasar a serie con la ficha de la serie: %+v", y)
+	}
+	if w := keep(mc.do("POST", "/admin/api/titles/y/match", map[string]any{"tmdb": 83867, "kind": "pelicula"})); w.Code != http.StatusBadRequest {
+		t.Fatalf("tipo no válido: %d", w.Code)
 	}
 	if w := keep(mc.do("POST", "/admin/api/titles/nope/match", map[string]any{"tmdb": 78})); w.Code != http.StatusNotFound {
 		t.Fatalf("ficha desconocida: %d", w.Code)

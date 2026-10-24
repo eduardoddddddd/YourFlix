@@ -175,7 +175,7 @@ Uno a la vez, en cola (máx. 32); si ya hay uno igual en cola o en marcha, se de
 | `GET /pending` | `{"tmdb":true,"items":[{"id","kind","title","year","identifyTried","files":[{"id","source","path","size","season","episode"}],"candidates":[{"tmdb","title","english","original","year","score","votes"}]}]}` — las fichas que TMDB no identificó con seguridad (ADR-004) |
 | `GET /titles?q=&kind=` | Buscar cualquier ficha (para corregir un emparejado): `{"total","items":[{"id","kind","title","year","tmdb","matchSource","locked","poster","files":[…]}]}` (50 como mucho) |
 | `GET /tmdb/search?q=&year=&kind=movie\|series` | Búsqueda manual en TMDB (es-ES; si con año no hay nada, sin año): `{"kind","items":[{"tmdb","title","original","year","votes","popularity","poster"}]}`. `poster` es una miniatura `https://image.tmdb.org/…` |
-| `POST /titles/{id}/match` `{"tmdb":78}` | Igual que `yourflix match ID --tmdb 78`: la ficha queda **bloqueada** (`manual`); si esa película ya existía, se fusiona con ella. `{"title","year","tmdb","merged","locked"}` |
+| `POST /titles/{id}/match` `{"tmdb":78,"kind":"movie"}` | Igual que `yourflix match ID --tmdb 78`: la ficha queda **bloqueada** (`manual`); si esa película ya existía, se fusiona con ella. `kind` es el tipo del resultado elegido (`movie` \| `series`; los IDs de TMDB de películas y series son espacios distintos): si no coincide con el de la ficha, la ficha cambia de tipo; sin `kind`, el de la ficha. `{"title","year","tmdb","kind","merged","locked"}` |
 | `POST /identify` `{"retry":false}` | 202 con el trabajo: `yourflix identify [--retry]` |
 
 ## Estado

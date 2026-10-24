@@ -494,7 +494,7 @@
     var name = cand.title + (cand.year ? ' (' + cand.year + ')' : '');
     confirmBox('Asignar ficha', 'Esta ficha pasará a ser «' + name + '» (TMDB ' + cand.tmdb + ') y quedará bloqueada: ni la semilla ni TMDB la cambiarán.', 'Asignar', false).then(function (ok) {
       if (!ok) return;
-      api('POST', 'titles/' + encodeURIComponent(titleId) + '/match', { tmdb: cand.tmdb }).then(function (r) {
+      api('POST', 'titles/' + encodeURIComponent(titleId) + '/match', { tmdb: cand.tmdb, kind: kind }).then(function (r) {
         toast(r.merged ? 'Unida a la ficha que ya existía: ' + r.title : 'Ficha asignada: ' + r.title + (r.year ? ' (' + r.year + ')' : ''));
         refreshPendingCount();
         if (after) after(); else viewCatalog();

@@ -181,14 +181,17 @@ func (a *Admin) tmdbSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"kind": kind, "items": items})
 }
 
-// match: POST /admin/api/titles/{id}/match {"tmdb": 78} — lo mismo que
-// «yourflix match ID --tmdb 78»: la ficha queda bloqueada (manual).
+// match: POST /admin/api/titles/{id}/match {"tmdb": 78, "kind": "movie"} — lo mismo que
+// «yourflix match ID --tmdb 78»: la ficha queda bloqueada (manual). kind es el tipo del
+// resultado elegido (los IDs de películas y series de TMDB son espacios distintos); si
+// no coincide con el de la ficha, la ficha cambia de tipo. Sin kind, el de la ficha.
 func (a *Admin) match(w http.ResponseWriter, r *http.Request) {
 	if !a.tmdbReady(w) {
 		return
 	}
 	var in struct {
-		TMDB int64 `json:"tmdb"`
+		TMDB int64  `json:"tmdb"`
+		Kind string `json:"kind"`
 	}
 	if !readJSON(w, r, &in) {
 		return
@@ -197,10 +200,17 @@ func (a *Admin) match(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "falta el ID de TMDB")
 		return
 	}
+	if in.Kind != "" && in.Kind != "movie" && in.Kind != "series" {
+		writeError(w, http.StatusBadRequest, "tipo no válido (movie, series)")
+		return
+	}
 	t, err := a.cfg.DB.Title(r.PathValue("id"))
 	if err != nil {
 		a.fail(w, err)
 		return
+	}
+	if in.Kind != "" {
+		t.Kind = in.Kind // Apply usa t.Kind para pedir la ficha y para buscar duplicados
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
@@ -211,7 +221,7 @@ func (a *Admin) match(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cfg.Log.Printf("admin: «%s» → %s (%s), TMDB %d (manual, bloqueada)", before, o.Title, o.Year, in.TMDB)
-	writeJSON(w, http.StatusOK, map[string]any{"title": o.Title, "year": o.Year, "tmdb": o.TMDB, "merged": o.Merged, "locked": !o.Merged})
+	writeJSON(w, http.StatusOK, map[string]any{"title": o.Title, "year": o.Year, "tmdb": o.TMDB, "merged": o.Merged, "locked": !o.Merged, "kind": t.Kind})
 }
 
 // identify: POST /admin/api/identify {"retry": false} — «yourflix identify [--retry]».
