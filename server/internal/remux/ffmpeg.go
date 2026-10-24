@@ -216,8 +216,10 @@ func (m *Manager) ffmpegArgs(path string, in *Info, v Variant, plan *Plan, start
 		args = append(args, "-vf", m.videoFilter(in))
 		switch m.encoder {
 		case "h264_amf":
+			// -forced_idr 1: sin él, h264_amf ignora -force_key_frames (IDR cada ~10 s en vez de
+			// cada segmento) y ffmpeg se relanzaba cada dos segmentos (revisión del PR #3).
 			args = append(args, "-c:v", "h264_amf", "-usage", "transcoding", "-quality", "speed", "-rc", "vbr_peak",
-				"-b:v", "8M", "-maxrate", "12M", "-bufsize", "16M", "-profile:v", "high")
+				"-b:v", "8M", "-maxrate", "12M", "-bufsize", "16M", "-profile:v", "high", "-forced_idr", "1")
 		default:
 			args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "12M", "-bufsize", "24M",
 				"-profile:v", "high", "-level:v", "4.2")

@@ -212,8 +212,13 @@ func (m *Manager) prepare(ctx context.Context, src Source, v Variant) (*prepared
 	}
 	dirty := false
 	if in == nil {
-		var err error
-		if in, err = probeInfo(ctx, m.cfg.FFprobe, src.Path); err != nil {
+		release, err := probeSlot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		in, err = probeInfo(ctx, m.cfg.FFprobe, src.Path)
+		release()
+		if err != nil {
 			return nil, err
 		}
 		dirty = true
@@ -222,8 +227,13 @@ func (m *Manager) prepare(ctx context.Context, src Source, v Variant) (*prepared
 		if in.Video.Codec != "h264" && in.Video.Codec != "hevc" {
 			return nil, ErrVariant
 		}
+		release, err := probeSlot(ctx)
+		if err != nil {
+			return nil, err
+		}
 		t0 := time.Now()
 		keys, err := keyframes(ctx, m.cfg.FFprobe, src.Path, in)
+		release()
 		if err != nil {
 			return nil, err
 		}
@@ -796,7 +806,9 @@ func (w *segWriter) commit() error {
 	err := w.f.Close()
 	w.f = nil
 	if err == nil && !exists(w.final) {
-		err = os.Rename(name, w.final)
+		if err = renameRetry(name, w.final); err != nil && exists(w.final) {
+			err = nil // otra sesión lo generó a la vez: vale el suyo
+		}
 	}
 	if err != nil || exists(name) {
 		os.Remove(name)
@@ -824,12 +836,37 @@ func writeAtomic(path string, b []byte) error {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Rename(name, path)
+		err = renameRetry(name, path)
 	}
 	if err != nil {
 		os.Remove(name)
 	}
 	return err
+}
+
+// renameRetry: en Windows, Rename falla un momento si Defender, el indexador u otro lector
+// tienen abierto el origen o el destino.
+func renameRetry(from, to string) error {
+	var err error
+	for i := 0; i < 5; i++ {
+		if err = os.Rename(from, to); err == nil {
+			return nil
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+	return err
+}
+
+// probeSlots: como mucho 2 ffprobe a la vez (un cliente que pida muchas listas no lanza cientos).
+var probeSlots = make(chan struct{}, 2)
+
+func probeSlot(ctx context.Context) (func(), error) {
+	select {
+	case probeSlots <- struct{}{}:
+		return func() { <-probeSlots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // wipe: al arrancar, la caché de segmentos empieza vacía (se conservan los info.json).
