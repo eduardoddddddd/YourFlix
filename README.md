@@ -43,6 +43,12 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**24-10-2026 — app 0.3.0 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues). Detalle en [docs/PRUEBAS-TV.md](docs/PRUEBAS-TV.md#app-030-en-la-tv-24-10-2026).
+
+- **Probado en la TV:** en «Alien contra predator» (DTS española por defecto + AC3 inglesa) suena la AC3. ▼ marca el botón Audio, y OK abre el menú con las 3 pistas de Akira; al elegir la japonesa, `setSelectTrack AUDIO 3` funciona y `getCurrentStreamInfo` devuelve `jpn`. El menú de subtítulos con «Español» muestra líneas en `#subtitle` (1266 líneas, cargadas en 5,8 s). ▲ vuelve al vídeo y la barra se oculta sola. En El Eternauta 1×1 sale «Siguiente ▶» y se puede marcar.
+- **Fallos para `tv/`:** (1) `fourCC` llega como `audio/x-ac3`, así que la etiqueta dice «EN 5.1 · AUDIO/X-AC3» y no «EN 5.1 · AC3». (2) AVPlay **no lista la pista DTS** en `getTotalTrackInfo` (en Alien solo aparece la AC3, con index 1), y el `setSelectTrack AUDIO 1` del arranque, lanzado antes de `play()`, devuelve `PLAYER_ERROR_INVALID_STATE`. No hace daño, porque AVPlay ya suena con la única pista que expone, pero el cambio en estado READY no vale. (3) En Akira el menú de subtítulos pone «Español», no «Español · Completos».
+- Sin comprobar: capturas, porque `Page.captureScreenshot` no responde en la TV.
+
 **24-10-2026 — app de la TV 0.3.0: botones de audio y subtítulos en pantalla (sin instalar todavía).**
 
 - Hecho: en el reproductor, ▼ baja a una fila de botones (Audio, Subtítulos, Siguiente); ◀ ▶ para moverse, OK abre el menú, ▲ o Atrás vuelve al vídeo. El mando de The Serif no tiene botones de color, que siguen funcionando (verde y amarillo). Menú de audio con idioma, canales y códec («ES 5.1 · AC3»). Si la pista por defecto es DTS (AVPlay la descarta y la tele se queda muda), la app pasa sola a la primera pista que sí suena; si solo hay DTS, lo avisa. La ficha ya no muestra el soporte de origen; las dos fuentes se llaman «Ally» (cambiado en la base de datos, sin reiniciar el servidor). El simulador de AVPlay descarta las pistas DTS como la TV.

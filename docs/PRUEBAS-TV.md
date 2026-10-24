@@ -110,3 +110,28 @@ Notas:
 - `sdb shell 0 debug` se quedó colgado dos veces, sin imprimir nada, justo después de despertar la TV. Funcionó tras `sdb shell 0 was_kill Z8YOURFLX1.YourFlix` (`... successfully launched ... port: NNNNN`).
 - Sin comprobar: HDR (no se puede ver a ojo por CDP), 4K a más de 15 Mb/s desde el Ally (el otro 4K, Ciudadano Kane, va a 5,2 Mb/s), un DTS y subtítulos desde el T7.
 
+## App 0.3.0 en la TV (24-10-2026)
+
+Instalada desde el Mac (`tizen install`, mismo ID `Z8YOURFLX1.YourFlix`, perfil CineT7), lanzada con `sdb shell 0 debug` y manejada por CDP con `YF.player.key`. El servidor era el del Ally. Monitor activo toda la sesión: **0 latidos perdidos, 0 excepciones, 0 cuelgues**.
+
+**`getTotalTrackInfo` real** («Alien contra predator», DTS spa por defecto + AC3 eng): la DTS **no aparece**. Solo se listan:
+
+```
+AUDIO index 1  {"language":"eng","channels":"6","sample_rate":"48000","bit_rate":"384000","fourCC":"audio/x-ac3"}
+VIDEO index 0  {"fourCC":"video/x-h264","Width":"1280","Height":"544","Bit_rate":"0"}
+TEXT  index 2–4 {"track_num":"0","track_lang":"","subtitle_type":"-1","fourCC":"text/plain"}
+```
+
+`extra_info` trae `channels` (como texto) y `fourCC` en formato MIME (`audio/x-ac3`). En Akira los índices de AVPlay son 1, 2 y 3, igual que en el archivo.
+
+| Prueba | Resultado |
+|---|---|
+| a) Alien: DTS por defecto → AC3 | ✓ suena la AC3 (es la única pista que expone AVPlay). Registro: `[av] setSelectTrack AUDIO 1` seguido de `PLAYER_ERROR_INVALID_STATE` (se lanza en READY, antes de `play`). `#osdAudio`: «EN 5.1 · AUDIO/X-AC3» ✗ (se esperaba «EN 5.1 · AC3») |
+| b) Akira: ▼ → Audio → OK → japonés | ✓ menú con 3 pistas, `setSelectTrack AUDIO 3` sin error, `getCurrentStreamInfo` → `jpn`, el vídeo sigue avanzando |
+| b) Subtítulos | ✓ ▶ marca Subtítulos y OK abre el menú. Opciones: «Desactivados» y «Español» (sin la etiqueta «· Completos»). Cargados en 5,8 s (1266 líneas, extracción desde `C:\YourFlix\T7`); «31 AÑOS DESPUÉS DE LA TERCERA GUERRA…» visible en `#subtitle` |
+| b) ▲ | ✓ quita el foco de los botones y la barra se oculta sola antes de 5 s |
+| c) El Eternauta 1×1 | ✓ el botón «Siguiente ▶» es visible y se puede marcar con ▶ ▶ |
+| d) Capturas | ✗ `Page.captureScreenshot` no responde en la TV (se agota el tiempo) |
+
+Notas: el progreso de los archivos se dejó como estaba (Alien 30,796 s; Akira y El Eternauta 1×1 a 0). La preferencia de subtítulos de la app (`subPref`) quedó en «ES» porque se eligió Español en la prueba; antes probablemente era «EN». Una vez el reproductor de Akira se cerró solo mientras no se le enviaba ninguna tecla, sin errores en el registro. Repetido, el mismo recorrido fue bien. Quizá fue una tecla del mando real.
+
