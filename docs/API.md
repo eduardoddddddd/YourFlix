@@ -94,6 +94,43 @@ Etiqueta, tipo y estado de cada fuente (`active` | `paused` | `offline`) con su 
 [{"id":"d0602025fda2","label":"Pruebas","kind":"auto","state":"active","files":11}]
 ```
 
+## Cliente web ([ADR-006](DECISIONES.md))
+
+Rutas **añadidas** para los navegadores; la TV no las usa y las de arriba no cambian. Misma protección solo LAN.
+
+### `GET /`
+
+La web (`web/` del repo, o `--web RUTA`): `index.html`, `css/`, `js/`, `img/` y `vendor/hls.min.js`. Sin listados de carpetas ni `tests/`. Cabeceras `Cache-Control: no-cache` y `Content-Security-Policy` (todo del propio servidor).
+
+### `GET /remux`
+
+```json
+{"available":true,"videoEncoder":"h264_amf","maxJobs":2,"jobs":1}
+```
+
+`available: false` si el servidor arrancó con `--remux-jobs 0` (solo reproducción directa). `videoEncoder` vacío: no se recodifica vídeo (`--video-encoder off`, o no funciona ni `h264_amf` ni `libx264`).
+
+### HLS: `GET /files/{id}/hls/{variante}/…`
+
+`variante` = `a<índice de la pista de audio>-copy` (vídeo tal cual: H.264 u HEVC) · `a<índice>-h264` (vídeo recodificado a H.264, ≤ 1080p) · `an-…` sin audio. El índice es el `index` de `files[].audio` de la ficha. El audio sale siempre en AAC estéreo.
+
+| Recurso | Contenido |
+|---|---|
+| `master.m3u8?s=SESIÓN&t=SEGUNDOS` | Lista maestra (una variante, con `CODECS`, `RESOLUTION` y `VIDEO-RANGE` si es HDR copiado). `t`: dónde empezará el reproductor, para arrancar ffmpeg ahí |
+| `index.m3u8?s=…&from=N` | Lista VOD de **toda** la duración (`#EXT-X-PLAYLIST-TYPE:VOD`, `#EXT-X-ENDLIST`), segmentos fMP4 |
+| `init.mp4?s=…&from=N` | Segmento de inicio (ftyp+moov) |
+| `N.m4s?s=…` | Segmento N, generado bajo demanda (admite `Range`) |
+
+`s` identifica al reproductor (`[A-Za-z0-9_-]{1,32}`): cada sesión tiene como mucho una conversión; al saltar lejos, cambiar de pista o de capítulo, la anterior se para. Errores: **400** variante mal formada o pista inexistente (o `copy` con vídeo que no sea H.264/HEVC) · **404** archivo o segmento inexistente · **409** se pide `h264` y no hay codificador · **410** disco desconectado · **501** conversión desactivada · **503** ya hay `maxJobs` conversiones activas (`Retry-After: 10`) · **504** ffmpeg no dio el segmento en 90 s.
+
+### `POST /files/{id}/hls/{variante}/stop?s=SESIÓN`
+
+204. Para la conversión de ese reproductor (la web lo manda con `sendBeacon` al salir). Si no llega, se para sola a los 60 s sin peticiones.
+
+### `GET /files/{id}/vtt/{sid}`
+
+La misma pista que `/subtitles/{sid}`, en **WebVTT** (`text/vtt`) para un `<track>`.
+
 ## Pendiente (fases siguientes)
 
 Emparejamiento de la TV por código (fase 6). La administración está en la sección siguiente.

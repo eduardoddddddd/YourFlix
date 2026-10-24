@@ -1,6 +1,6 @@
 // yourflix: servidor de películas y series para la Samsung The Serif.
 //
-//	yourflix [--data DIR] serve [--addr :8787] [--rescan 30m]
+//	yourflix [--data DIR] serve [--addr :8787] [--rescan 30m] [--web DIR] [--remux-jobs 2] [--video-encoder auto]
 //	yourflix source add RUTA [--label L] [--kind auto|movies|series] [--exclude PATRÓN]...
 //	yourflix source list | scan [ID|--all] | pause ID | resume ID | remove ID
 //	yourflix seed import RUTA-CLON-cine-t7-catalogo
@@ -30,6 +30,7 @@ import (
 	"github.com/eduardoddddddd/YourFlix/server/internal/compat"
 	"github.com/eduardoddddddd/YourFlix/server/internal/identify"
 	"github.com/eduardoddddddd/YourFlix/server/internal/images"
+	"github.com/eduardoddddddd/YourFlix/server/internal/remux"
 	"github.com/eduardoddddddd/YourFlix/server/internal/scan"
 	"github.com/eduardoddddddd/YourFlix/server/internal/seed"
 	"github.com/eduardoddddddd/YourFlix/server/internal/store"
@@ -54,7 +55,7 @@ func main() {
 	g.StringVar(&a.dataDir, "data", envOr("YOURFLIX_DATA", "data"), "carpeta de datos (base de datos, imágenes)")
 	g.StringVar(&a.ffprobe, "ffprobe", envOr("YOURFLIX_FFPROBE", ""), "ruta de ffprobe (por defecto: junto al ejecutable o en el PATH)")
 	g.StringVar(&a.profile, "profile", "", "perfil de la TV (por defecto el incrustado)")
-	g.StringVar(&a.ffmpeg, "ffmpeg", envOr("YOURFLIX_FFMPEG", ""), "ruta de ffmpeg, para subtítulos (por defecto: junto al ejecutable o en el PATH)")
+	g.StringVar(&a.ffmpeg, "ffmpeg", envOr("YOURFLIX_FFMPEG", ""), "ruta de ffmpeg, para subtítulos y la web (por defecto: junto al ejecutable o en el PATH)")
 	g.StringVar(&a.tmdbTokenFile, "tmdb-token-file", envOr("YOURFLIX_TMDB_TOKEN_FILE", ""), "fichero con el token de lectura de TMDB (o TMDB_ACCESS_TOKEN / TMDB_API_KEY)")
 	g.Usage = usage
 	g.Parse(os.Args[1:])
@@ -119,7 +120,8 @@ func main() {
 func usage() {
 	fmt.Fprint(os.Stderr, `yourflix `+version+`
 
-  yourflix [--data DIR] serve [--addr :8787] [--rescan 30m]
+  yourflix [--data DIR] serve [--addr :8787] [--rescan 30m] [--web DIR] [--remux-jobs 2]
+                             [--remux-cache-gb 20] [--video-encoder auto|h264_amf|libx264|off]
   yourflix source add RUTA [--label "Samsung T7"] [--kind auto|movies|series] [--exclude "*sample*"]
   yourflix source list
   yourflix source scan [ID|ETIQUETA|--all]
@@ -130,7 +132,7 @@ func usage() {
   yourflix match ID_FICHA --tmdb ID   (elegir la ficha a mano; queda bloqueada)
   yourflix admin password         (contraseña de la web de administración, /admin/)
 
-Opciones globales: --data (o YOURFLIX_DATA), --ffprobe (o YOURFLIX_FFPROBE), --profile,
+Opciones globales: --data (o YOURFLIX_DATA), --ffprobe (o YOURFLIX_FFPROBE), --ffmpeg (o YOURFLIX_FFMPEG), --profile,
   --tmdb-token-file (o YOURFLIX_TMDB_TOKEN_FILE, TMDB_ACCESS_TOKEN, TMDB_API_KEY)
 `)
 }
@@ -157,6 +159,27 @@ func findTool(name string) string {
 		return p
 	}
 	return name
+}
+
+// findWeb: la carpeta de la web, junto al ejecutable (instalación) o en la carpeta actual (repo).
+func findWeb(dir string) string {
+	cands := []string{dir}
+	if dir == "" {
+		cands = nil
+		if exe, err := os.Executable(); err == nil {
+			cands = append(cands, filepath.Join(filepath.Dir(exe), "web"))
+		}
+		cands = append(cands, "web", filepath.Join("..", "web"))
+	}
+	for _, c := range cands {
+		if st, err := os.Stat(filepath.Join(c, "index.html")); err == nil && !st.IsDir() {
+			if abs, err := filepath.Abs(c); err == nil {
+				return abs
+			}
+			return c
+		}
+	}
+	return ""
 }
 
 type multi []string
@@ -357,6 +380,10 @@ func (a *app) serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", ":8787", "dirección de escucha")
 	rescan := fs.Duration("rescan", 30*time.Minute, "re-escaneo periódico de las fuentes (0 = desactivado)")
+	webDir := fs.String("web", envOr("YOURFLIX_WEB", ""), "carpeta de la web (por defecto «web» junto al ejecutable o en la carpeta actual)")
+	remuxJobs := fs.Int("remux-jobs", 2, "conversiones en vivo simultáneas para la web (0 = solo reproducción directa)")
+	remuxCache := fs.Float64("remux-cache-gb", 20, "tope de la caché temporal de la web (GB, en DATOS/remux)")
+	encoder := fs.String("video-encoder", "auto", "recodificación de vídeo para la web: auto (h264_amf y si no libx264) | h264_amf | libx264 | off")
 	fs.Parse(args)
 	prof, err := compat.Load(a.profile)
 	if err != nil {
@@ -364,10 +391,16 @@ func (a *app) serve(args []string) error {
 	}
 	srv := &api.Server{DB: a.db, Images: images.New(filepath.Join(a.dataDir, "images")), Subs: &subs.Extractor{FFmpeg: a.ffmpeg, Dir: filepath.Join(a.dataDir, "subs")},
 		Profile: prof, Version: version, ServerID: a.serverID(), Log: log.Default()}
+	web := &api.Web{API: srv, Dir: findWeb(*webDir)}
+	if *remuxJobs > 0 {
+		web.Remux = remux.New(remux.Config{FFmpeg: a.ffmpeg, FFprobe: a.ffprobe, Dir: filepath.Join(a.dataDir, "remux"), MaxJobs: *remuxJobs,
+			Encoder: *encoder, CacheBytes: int64(*remuxCache * (1 << 30)), Log: log.Default()})
+		defer web.Remux.Close()
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	go a.scanLoop(ctx, *rescan)
-	hs := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	hs := &http.Server{Addr: *addr, Handler: web.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	hs.Handler = a.withAdmin(hs.Handler, prof, stop) // stop: reinicio desde la admin (iniciar.cmd lo relanza)
 	go func() {
 		<-ctx.Done()
@@ -379,6 +412,11 @@ func (a *app) serve(args []string) error {
 		}
 	}()
 	log.Printf("YourFlix %s escuchando en %s · datos en %s · perfil %s · ffprobe %s", version, *addr, a.dataDir, prof.ID, a.ffprobe)
+	if web.Dir != "" {
+		log.Printf("Web en http://<esta IP>%s/ (carpeta %s) · conversiones simultáneas: %d · ffmpeg %s", *addr, web.Dir, *remuxJobs, a.ffmpeg)
+	} else {
+		log.Printf("Sin web: no se encuentra la carpeta «web» (usa --web RUTA)")
+	}
 	if err := hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
