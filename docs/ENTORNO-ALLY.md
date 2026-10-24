@@ -65,7 +65,7 @@ Rendimiento observado de la copia: ≈200 MB/s desde el T7 y ≈110 MB/s desde e
 - No se ha tocado la TV: no se instaló nada nuevo ni se lanzó nada.
 - No se ha medido el caudal Wi-Fi Ally → TV (S7/S10).
 - La copia se verificó solo por número de archivos y bytes totales; **no se comparó el contenido** (ni hash) entre origen y destino. El emparejado «por bytes» con la semilla (494 de 496 vídeos) compara tamaño en bytes y duración, así que **no demuestra** la integridad del contenido. Pendiente si se quiere certeza: `Get-FileHash` (o `robocopy /L` con comparación) sobre origen y copia.
-- Nada está commiteado todavía: los cambios del repo son solo documentación (`README.md`, `PLAN.md`, `docs/`).
+- No se ha cambiado código de `server/` ni de `tv/`: los cambios de esta sesión son solo documentación (`README.md`, `PLAN.md`, `docs/`) y están fusionados en `main` (24-10-2026).
 
 ## Por dónde seguir (S10 y después)
 
