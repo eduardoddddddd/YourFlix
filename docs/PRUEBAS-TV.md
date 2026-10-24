@@ -83,6 +83,30 @@ El «arranque» incluye 2 s de reproducción a propósito: el tiempo real hasta 
 ### No probado (pendiente)
 
 - **HDR real**: el archivo de prueba no llevó las etiquetas de color (ffprobe: `color_transfer=unknown`). Probar con uno de los 3 4K de la colección.
-- **Servidor en el ROG Ally** (S10): misma matriz con el binario Windows, Defender y disco USB.
+- ~~**Servidor en el ROG Ally** (S10)~~: hecho el 24-10-2026, ver «S10» más abajo.
 - Pistas con DTS **y** otra pista compatible en el mismo archivo (¿elige AVPlay la compatible?).
 - ASS embebido y SRT externo (los convertirá el servidor; no dependen de AVPlay).
+
+## S10 — servidor en el ROG Ally, probado en la TV (24-10-2026)
+
+Servidor `serve` en el Ally (Windows 11, `192.168.1.13`, **Wi-Fi**, datos en `C:\YourFlix`), app **0.2.0 ya instalada** (sin reinstalar), lanzada desde el Mac con `sdb shell 0 debug` y monitor CDP (`tools/tv-monitor/cdp.mjs monitor`) activo toda la sesión: **0 latidos perdidos, 0 excepciones, ningún cuelgue**. Prueba automática por CDP con el reproductor de la app (`YF.player.play` / `P.key`); el salto al 50 % es un `seekTo` directo, uno cada vez.
+
+**Descubrimiento:** la app probó la dirección de fábrica (el Mac, `192.168.1.3`, sin servidor), que falló a los 0,66 s; empezó el barrido de la /24 a los 1,09 s y encontró el Ally en la primera tanda a los **1,14 s** desde que se cargó la página. Lo guardó ella sola, así que **no hizo falta** poner la IP a mano por CDP. A los 1,35 s ya pedía `/titles`.
+
+**Caudal Wi-Fi Ally → TV** (XHR desde la app, 3 × 40 MB con `Range`, respuesta 206): **90, 92 y 103 Mb/s**. El Mac daba 51–66 Mb/s.
+
+| Título (fuente T7) | Vídeo | Mb/s | apertura¹ | 6 s iniciales | salto 50 %² | +30 s | −30 s | pausa / reanudar | salir |
+|---|---|---|---|---|---|---|---|---|---|
+| Akira | H.264 8 bits 1040p, 3 × AC3 | 3,4 | ✓ 1,54 s | ✓ 0 cortes | ✓ 0,30 s | ✓ 0 cortes | ✓ 0 cortes | ✓ se queda quieta / 0,31 s | ✓ `NONE`, vuelve a la interfaz |
+| Barry Lyndon | HEVC Main10 1080p, 2 × AC3 | 2,7 | ✓ 0,82 s | ✓ 0 | ✓ 0,36 s | ✓ 0 | ✓ 0 | ✓ / 0,31 s | ✓ |
+| The Punisher: One Last Kill | **HEVC Main10 2160p**, 2 × E-AC3, `SET_MODE_4K` | 14,8 | ✓ 0,82 s | ✓ 0 | ✓ 0,34 s + 1,1 s hasta volver a avanzar | ✓ 0 | ⚠ 1 parón de > 1 s justo después | ✓ / 0,31 s | ✓ |
+
+¹ Desde `play()` hasta que el tiempo de reproducción pasa de 0,3 s (`prepareAsync` tarda menos de 1 s en los tres).
+² Es lo que tarda el `seekTo` en confirmar. En ±30 s, AVPlay devuelve el tiempo de destino casi al instante, así que lo útil es contar los parones de los 5 s siguientes (vídeo en `PLAYING` sin avanzar durante más de 1 s).
+
+Notas:
+- Después se dejó el progreso de los tres archivos a 0 (`PUT /progress`), así que no aparecen en «Seguir viendo». No tenían progreso antes de la prueba.
+- **Wake-on-LAN** a `A0:D0:5B:4A:4F:20` no sacó a la TV del reposo en 30 s. Se encendió poco después (no está claro si fue por el WoL, por la conexión al canal `samsung.remote.control` en `:8001` o porque la encendió el usuario).
+- `sdb shell 0 debug` se quedó colgado dos veces, sin imprimir nada, justo después de despertar la TV. Funcionó tras `sdb shell 0 was_kill Z8YOURFLX1.YourFlix` (`... successfully launched ... port: NNNNN`).
+- Sin comprobar: HDR (no se puede ver a ojo por CDP), 4K a más de 15 Mb/s desde el Ally (el otro 4K, Ciudadano Kane, va a 5,2 Mb/s), un DTS y subtítulos desde el T7.
+
