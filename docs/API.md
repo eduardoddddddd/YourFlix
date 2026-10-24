@@ -96,4 +96,105 @@ Etiqueta, tipo y estado de cada fuente (`active` | `paused` | `offline`) con su 
 
 ## Pendiente (fases siguientes)
 
-Emparejamiento y endpoints de administración (`/admin/…`).
+Emparejamiento de la TV por código (fase 6). La administración está en la sección siguiente.
+
+---
+
+# API de administración · `/admin/api`
+
+Base: `http://<servidor>:8787/admin/api`. La sirve `internal/admin` (fase 5) junto a la web `admin/` en `/admin/`. Es **otra API**, aparte de `/api/v1`: sin CORS, con sesión, y **sí devuelve rutas de disco** (fuentes, explorador de carpetas, archivos), pero solo a una sesión de administración o a `localhost`, nunca a la TV ni a la web de la colección.
+
+## Seguridad
+
+- **Solo LAN**, como `/api/v1`: 403 a IP que no sean privadas, de bucle local o de enlace local.
+- **Desde el propio servidor** (`127.0.0.1`/`::1` **y** cabecera `Host` `localhost`/`127.0.0.1`/`[::1]`) se entra **sin contraseña**. Comprobar el `Host` evita que una web abierta en el Ally entre con un dominio que resuelva a 127.0.0.1 (DNS rebinding).
+- **Desde otro equipo**: contraseña de administración, guardada con hash PBKDF2-SHA256 (600 000 vueltas, sal aleatoria) en `settings.adminPassword`, y cookie de sesión `yf_admin` (`HttpOnly`, `SameSite=Strict`, `Path=/admin/`, 7 días). Las sesiones viven en memoria: reiniciar el servidor obliga a volver a entrar. Cambiar la contraseña (web o CLI) cierra las demás sesiones.
+- **Primera contraseña**: solo desde `localhost` (web) o con `yourflix admin password` (lee de la entrada estándar); también `YOURFLIX_ADMIN_PASSWORD` en el primer arranque si aún no hay ninguna. Mínimo 8 caracteres. Desde la LAN no se puede definir la primera.
+- **Intentos**: 5 contraseñas malas seguidas desde una IP la bloquean 1 minuto (429).
+- **CSRF**: todo lo que no es `GET` exige `Content-Type: application/json`, `Origin` (si viene) igual al `Host`, y la cabecera `X-CSRF-Token` con el token de la sesión (lo dan `GET /session` y `POST /login`). Desde `localhost` también: `GET /session` crea una sesión local para tener token.
+- Cabeceras: `Content-Security-Policy` (`default-src 'self'`; imágenes también de `image.tmdb.org`), `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` en la API.
+- **El token de TMDB nunca sale**: ni en respuestas ni en el registro (el anillo de registro de la página de estado lo tacha si apareciera).
+
+Errores: JSON `{"error":"mensaje en español"}` con 400 (datos), 401 (sin sesión), 403 (LAN/CSRF), 404, 409 (conflicto), 429 (intentos o cola llena), 502 (TMDB), 503 (TMDB sin configurar).
+
+## Sesión
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /session` | `{"authenticated":true,"local":true,"passwordSet":false,"version":"0.1.0","csrf":"…"}`. `csrf` solo con sesión |
+| `POST /login` `{"password":"…"}` | 200 `{"authenticated":true,"csrf":"…"}` + cookie · 401 contraseña mala · 409 aún no hay contraseña · 429 |
+| `POST /logout` | 204, borra la cookie |
+| `POST /password` `{"current":"…","password":"…"}` | 204. La primera, solo desde `localhost`; desde la LAN hace falta `current` |
+
+## Fuentes
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /sources` | `[{"id","label","path","kind","excludes":[…],"state","createdAt","lastScanAt","files"}]` |
+| `POST /sources` `{"path","label","kind","excludes":[…],"scan":true}` | 201 `{"source":{…},"job":{…},"warning":"…"}`. La ruta debe ser una carpeta absoluta accesible; 409 si ya es una fuente; `warning` si se solapa con otra. `scan:true` encola el escaneo |
+| `PATCH /sources/{id}` `{"label","kind","excludes"}` | Cambia lo que venga (la ruta no se cambia). Tipo y exclusiones se aplican en el próximo escaneo; el tipo solo reinterpreta archivos nuevos, cambiados o pendientes |
+| `POST /sources/{id}/pause` · `/resume` | Estado `paused` / `active` (pausada = no se escanea) |
+| `DELETE /sources/{id}` | Saca la fuente del catálogo con sus archivos y su progreso **en la base de datos**; no toca el disco. `{"removed","files","orphanTitles"}` |
+| `POST /sources/{id}/scan` · `POST /scan` | 202 con el trabajo (una fuente o todas). Tras escanear, si hay TMDB, identifica lo nuevo (como `serve`) |
+
+Solo IDs en la URL, nunca etiquetas (la CLI sí acepta etiquetas).
+
+## Explorador de carpetas
+
+`GET /browse?path=` — sin `path`, las raíces: unidades `A:`…`Z:` que respondan en 3 s (Windows) o `/`, la carpeta personal y `/Volumes`, `/media`, `/mnt` si existen (macOS/Linux). Con `path` (absoluta), sus **subcarpetas** (sin ocultas, `$RECYCLE.BIN` ni `System Volume Information`) y cuántos vídeos hay directamente dentro. Solo lista; no lee archivos.
+
+```json
+{"path":"C:\\YourFlix","parent":"C:\\","sep":"\\","videos":0,"truncated":false,
+ "dirs":[{"name":"Patriot","path":"C:\\YourFlix\\Patriot"},{"name":"T7","path":"C:\\YourFlix\\T7"}],
+ "roots":[{"name":"C:","path":"C:\\"},{"name":"D:","path":"D:\\"}]}
+```
+
+400 ruta relativa o ilegible · 404 no existe · 10 s de espera máxima por carpeta (disco dormido).
+
+## Trabajos (escaneos e identificación)
+
+Uno a la vez, en cola (máx. 32); si ya hay uno igual en cola o en marcha, se devuelve ese. Comparten candado con el re-escaneo periódico de `serve` (ver `server/cmd/yourflix/admin.go`).
+
+```json
+{"id":"a1b2c3d4e5f6","kind":"scan","title":"Escanear «Samsung T7»","state":"running","queuedAt":"…","startedAt":"…",
+ "processed":120,"current":"pelis/Akira (1988).mkv → seed-bytes","lines":["…últimas 40…"],"summary":[],"error":""}
+```
+
+`state`: `queued` · `running` · `done` · `failed`. `summary`: el informe de cada fuente (vídeos, nuevos, cambiados, movidos, ausentes, fichas por semilla/título/nombre, errores de ffprobe) y de TMDB.
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /jobs` | `{"jobs":[…]}`, del más reciente al más antiguo (20 últimos) |
+| `GET /jobs/{id}` | Un trabajo |
+| `GET /jobs/events` | **SSE**: evento `jobs` con `{"jobs":[…]}` al conectar y en cada cambio (máx. 4/s); latido cada 20 s |
+
+## Catálogo
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /pending` | `{"tmdb":true,"items":[{"id","kind","title","year","identifyTried","files":[{"id","source","path","size","season","episode"}],"candidates":[{"tmdb","title","english","original","year","score","votes"}]}]}` — las fichas que TMDB no identificó con seguridad (ADR-004) |
+| `GET /titles?q=&kind=` | Buscar cualquier ficha (para corregir un emparejado): `{"total","items":[{"id","kind","title","year","tmdb","matchSource","locked","poster","files":[…]}]}` (50 como mucho) |
+| `GET /tmdb/search?q=&year=&kind=movie\|series` | Búsqueda manual en TMDB (es-ES; si con año no hay nada, sin año): `{"kind","items":[{"tmdb","title","original","year","votes","popularity","poster"}]}`. `poster` es una miniatura `https://image.tmdb.org/…` |
+| `POST /titles/{id}/match` `{"tmdb":78,"kind":"movie"}` | Igual que `yourflix match ID --tmdb 78`: la ficha queda **bloqueada** (`manual`); si esa película ya existía, se fusiona con ella. `kind` es el tipo del resultado elegido (`movie` \| `series`; los IDs de TMDB de películas y series son espacios distintos): si no coincide con el de la ficha, la ficha cambia de tipo; sin `kind`, el de la ficha. `{"title","year","tmdb","kind","merged","locked"}` |
+| `POST /identify` `{"retry":false}` | 202 con el trabajo: `yourflix identify [--retry]` |
+
+## Estado
+
+`GET /status`:
+
+```json
+{"version":"0.1.0","startedAt":"…","uptimeSeconds":3600,"dataDir":"C:\\…\\private\\data","os":"windows/amd64","go":"go1.26.2",
+ "tools":[{"name":"ffprobe","path":"C:\\…\\ffprobe.exe","found":true,"version":"ffprobe version 9.0.2-full_build-www.gyan.dev"},{"name":"ffmpeg",…}],
+ "tmdb":true,"passwordSet":true,
+ "disks":[{"path":"C:\\","usedBy":["datos de YourFlix","Samsung T7","USB Patriot"],"free":912000000000,"total":2000000000000}],
+ "sources":[{"id","label","state","files","lastScanAt"}],
+ "scans":[{"id","sourceId","label","startedAt","seconds","report":{…},"error"}],
+ "titles":251,"pending":0,"log":["…40 últimas líneas…"]}
+```
+
+`tmdb` solo dice si hay credenciales. `disks` agrupa las fuentes que están en el mismo disco (3 s máximo por disco). `scans`: los 15 últimos escaneos lanzados **desde la admin** (los periódicos de `serve` se ven en `sources[].lastScanAt` y en el registro).
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /log?n=200` | `{"lines":[…]}`: últimas líneas del registro del servidor (máx. 1000; se guardan 500 en memoria) |
+| `GET /compat` | Resumen de compatibilidad con el perfil de la TV: `{"profile","total","counts":{"direct","warn","optimize"},"reasons":[{"reason","count"}],"items":[{"fileId","titleId","title","year","source","path","season","episode","status","reasons":[…]}]}` (solo `warn` y `optimize`, primero los `optimize`) |
