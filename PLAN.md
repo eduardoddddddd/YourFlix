@@ -39,7 +39,7 @@ Es la alternativa razonable y conviene decirlo: Jellyfin hace casi todo esto y t
 | SDB | `192.168.1.4:26101`; target `QE43LS01BBUXXC` (no la IP) para `-t` |
 | Mac | Apple Silicon, `192.168.1.3`; Tizen Studio en `~/tizen-studio` (CLI 2.5.25, SDB 4.2.36), Go 1.26, ffmpeg/ffprobe Homebrew |
 | Firma | Perfil Samsung `CineT7`, caduca **18-07-2027**. Nunca copiar certificados ni contraseñas al repo |
-| Servidor | **Asus ROG Ally** (Windows 11, AMD Z1 x64, Wi-Fi 6E, **sin puerto Ethernet**, USB-C compartido con la carga). Ver §3.6 |
+| Servidor | **Asus ROG Ally** (Windows 11, AMD Z1 x64, Wi-Fi 6E, **sin puerto Ethernet**, USB-C compartido con la carga). Ver §3.6. **IP actual `192.168.1.13` (Wi-Fi, reservada en el DHCP); con dock por cable tendrá otra IP fija (la dará el usuario).** Biblioteca copiada a `C:\YourFlix\T7` y `C:\YourFlix\Patriot` (ADR-005); relevo en `docs/ENTORNO-ALLY.md` |
 | TMDB | Clave y token de lectura del usuario en Joplin (nota «TMDB API»); **comprobados el 23-10-2026** (búsqueda «Akira 1988» → 200). Copia local en `secrets/tmdb.token`, fuera de Git |
 
 ### Lecciones de AstroIPTV que se heredan tal cual
@@ -411,7 +411,9 @@ Transcodificación en vivo (HLS) · varios perfiles de usuario · capítulos MKV
 
 ### Abiertas
 
-1. **Go** (recomendado) o Python para el servidor.
+1. ~~Go o Python~~ → **Go** (cerrada, ADR-002).
 2. ¿Un único perfil de usuario o varios (progreso por persona)?
 3. Pasar las **memorias de Codex** con el formato que admite la tele para el perfil de la fase 0.
 4. ¿Qué modelo exacto de Ally (original o Ally X) y si hay dock con Ethernet?
+
+> **Actualización 24-10-2026:** el trabajo continúa en el propio Ally (Wi-Fi `192.168.1.13` por ahora; cable e IP nueva después). Estado real y relevo: `README.md` («Estado») y `docs/ENTORNO-ALLY.md`.

@@ -31,3 +31,16 @@ En cascada: (0) misma huella ya identificada en otra fuente → mismo título (c
 **Por qué.** Una ficha equivocada (con su portada) es peor que una pendiente: se ve en la tele y nadie la corrige. La primera versión eligió «Parasites» en lugar de «Parásitos» y aceptó «S4 (2008)» para un archivo `s4_dts.mkv`; ambos casos tienen test.
 
 **Consecuencias.** La web de administración (fase 5) debe mostrar los pendientes con sus candidatos para elegir con un clic (hoy: `yourflix titles --pending` y `yourflix match`).
+
+## ADR-005 · El servidor lee copias locales en `C:\YourFlix`, no los discos USB — 24-10-2026
+
+**Contexto.** El servidor corre en el ROG Ally (Wi-Fi hoy, cable más adelante) y la biblioteca vivía en el T7 y el Patriot, ambos por USB, con letras de unidad cambiantes y riesgo de que Windows duerma el disco.
+
+**Decisión.** A petición del usuario se copió el contenido de ambos discos al SSD interno: `C:\YourFlix\T7` (carpetas `pelis` y `pelis2`, 882 GB) y `C:\YourFlix\Patriot` (104 GB). Las fuentes de YourFlix apuntan a esas rutas con las etiquetas «Samsung T7» y «USB Patriot». Los discos originales no se modifican y siguen siendo la copia de seguridad.
+
+**Consecuencias.**
+- El escaneo y el emparejado por bytes funcionan igual (460/462 y 34/34 por bytes con la semilla). La huella es de contenido, no de ruta.
+- Desaparece el riesgo de disco USB dormido o con otra letra para el uso diario; el soporte «desconectado» queda como función para discos que se añadan a futuro.
+- Ocupa 986 GB de los 1,86 TB de C:. Avisar antes de añadir más fuentes grandes, y contar con la carpeta de optimizados (fase 4).
+- Para sincronizar con los discos originales hay que repetir la copia con `robocopy` (ver `docs/ENTORNO-ALLY.md`) y re-escanear.
+- Dato nuevo para §3.6 del plan: la lectura desde los SSD USB iba a ≈110–200 MB/s en el Ally; la copia local evita ese cuello en servicio.
