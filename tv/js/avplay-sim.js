@@ -58,7 +58,7 @@
       var f = file(), out = [];
       if (f && f.video) out.push({ index: 0, type: 'VIDEO', extra_info: '{}' });
       // Como la TV: las pistas DTS no aparecen (AVPlay las descarta sin error).
-      (f && f.audio || []).forEach(function (a) { if (!/dts/i.test(a.codec)) out.push({ index: a.index, type: 'AUDIO', extra_info: JSON.stringify({ fourCC: a.codec, language: a.language || '', channels: String(a.channels || '') }) }); });
+      (f && f.audio || []).forEach(function (a) { if (!/dts/i.test(a.codec)) out.push({ index: a.index, type: 'AUDIO', extra_info: JSON.stringify({ fourCC: 'audio/x-' + a.codec, language: a.language || '', channels: String(a.channels || '') }) }); });
       (f && f.subtitles || []).forEach(function (s) { if (s.text) out.push({ index: s.index, type: 'TEXT', extra_info: JSON.stringify({ language: s.language || '' }) }); });
       return out;
     },

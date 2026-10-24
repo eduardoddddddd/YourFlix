@@ -128,13 +128,19 @@ test('subtítulos: preferencia y forzados', () => {
 });
 
 test('audio: si la pista por defecto es DTS, pasar a una que suene', () => {
-  // «Alien contra Predator»: DTS español por defecto + AC3 inglés. AVPlay solo lista la AC3.
+  // «Alien contra Predator»: DTS español por defecto + AC3 inglés. En la TV, AVPlay solo lista la AC3 y ya suena.
   const file = [{ codec: 'dts', default: true }, { codec: 'ac3' }];
-  assert.equal(player.audioStart(file, [{ index: 2, codec: 'AC3' }]), 0);
+  assert.equal(player.audioStart(file, [{ index: 1, codec: 'AC3' }]), -1, 'AVPlay ya descartó la DTS: no tocar');
   assert.equal(player.audioStart(file, [{ index: 1, codec: 'DTS' }, { index: 2, codec: 'AC3' }]), 1, 'si AVPlay la listara, saltarla');
   assert.equal(player.audioStart([{ codec: 'dts' }], []), -1, 'solo DTS: no hay nada que elegir');
   assert.equal(player.audioStart([{ codec: 'ac3', default: true }, { codec: 'dts' }], [{ index: 1, codec: 'AC3' }]), -1, 'por defecto compatible: no tocar');
   assert.equal(player.audioStart([], []), -1);
+  // fourCC real de la TV: {"language":"eng","channels":"6","fourCC":"audio/x-ac3"}
+  assert.equal(player.codecName('audio/x-ac3'), 'AC3');
+  assert.equal(player.codecName('audio/x-eac3'), 'EAC3');
+  assert.equal(player.codecName('audio/mpeg'), 'MPEG');
+  assert.equal(player.codecName('ac3'), 'AC3');
+  assert.equal(player.codecName(undefined), '');
 });
 
 test('destino de salto: sin pasar del final ni del principio', () => {

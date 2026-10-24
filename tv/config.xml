@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://yourflix.local/YourFlix" version="0.3.0" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://yourflix.local/YourFlix" version="0.3.1" viewmodes="maximized">
   <tizen:application id="Z8YOURFLX1.YourFlix" package="Z8YOURFLX1" required_version="2.3"/>
   <name>YourFlix</name>
   <icon src="icon.png"/>

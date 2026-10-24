@@ -43,6 +43,12 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**24-10-2026 — app 0.3.1: arreglos de la prueba en la TV (sin instalar todavía).**
+
+- Hecho: la etiqueta de audio limpia el `fourCC` real de la TV (`audio/x-ac3` → «AC3»). Ya no se llama a `setSelectTrack` al arrancar cuando AVPlay ha descartado la DTS (es lo que hace la TV real: suena sola la pista compatible); si algún día la listara, el cambio se hace después de `play()`, no en READY. El simulador da el `fourCC` como la TV. El fallo (3) no lo era: Akira solo tiene una pista de subtítulos en español y el servidor la llama «Español».
+- Probado: 13 tests; en Chromium con AVPlay simulado contra el Ally, Alien muestra «EN 5.1 · AC3» y Akira «ES 5.1 · AC3 (1/3)», sin cambios de pista al arrancar. Progreso intacto.
+- Pendiente: instalar la 0.3.1 en la TV. Observado una vez en la prueba de la 0.3.0: el reproductor de Akira se cerró solo sin errores (posiblemente una tecla del mando real); vigilarlo.
+
 **24-10-2026 — app 0.3.0 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues). Detalle en [docs/PRUEBAS-TV.md](docs/PRUEBAS-TV.md#app-030-en-la-tv-24-10-2026).
 
 - **Probado en la TV:** en «Alien contra predator» (DTS española por defecto + AC3 inglesa) suena la AC3. ▼ marca el botón Audio, y OK abre el menú con las 3 pistas de Akira; al elegir la japonesa, `setSelectTrack AUDIO 3` funciona y `getCurrentStreamInfo` devuelve `jpn`. El menú de subtítulos con «Español» muestra líneas en `#subtitle` (1266 líneas, cargadas en 5,8 s). ▲ vuelve al vídeo y la barra se oculta sola. En El Eternauta 1×1 sale «Siguiente ▶» y se puede marcar.

@@ -70,16 +70,20 @@
   };
 
   // audioStart: posición (en las pistas que lista AVPlay) que hay que elegir a mano al empezar, o -1.
-  // AVPlay descarta las pistas DTS sin avisar: si la pista por defecto del archivo es DTS, la tele
-  // se queda muda aunque el archivo traiga otra pista compatible.
+  // En la TV real AVPlay descarta las pistas DTS y suena la primera compatible: no hay nada que hacer.
+  // Solo si AVPlay listara la DTS por defecto habría que pasar a otra (después de play: en READY,
+  // setSelectTrack da PLAYER_ERROR_INVALID_STATE).
   YF.audioStart = function (fileAudio, avTracks) {
     var dts = function (c) { return /dts|dca/i.test(c || ''); };
     fileAudio = fileAudio || [];
     var def = fileAudio.filter(function (a) { return a.default; })[0] || fileAudio[0];
-    if (!def || !dts(def.codec)) return -1;
+    if (!def || !dts(def.codec) || !avTracks.some(function (t) { return dts(t.codec); })) return -1;
     for (var i = 0; i < avTracks.length; i++) if (!dts(avTracks[i].codec)) return i;
     return -1;
   };
+
+  // codecName: fourCC de AVPlay a nombre corto («audio/x-ac3» → «AC3», «audio/mpeg» → «MPEG»).
+  YF.codecName = function (fourCC) { return String(fourCC || '').replace(/^audio\//i, '').replace(/^x-/i, '').toUpperCase(); };
 
   if (typeof document === 'undefined') return; // Node: solo la parte pura
 
@@ -205,7 +209,6 @@
     try { P.duration = av().getDuration() || P.duration; } catch (_) {}
     readAudio();
     var fix = YF.audioStart(P.opts.file.audio, P.audio);
-    if (fix >= 0) selectAudio(fix, true);
     if (!P.audio.length && P.opts.file.audio && P.opts.file.audio.length) P.notice = noAudioText();
     try { call('setSilentSubtitle', true); } catch (_) {} // AVPlay nunca dibuja: lo hace la app
     P.audioReady = true;
@@ -214,7 +217,7 @@
     var go = function () {
       var release = queue.block(); // ⏩ durante el arranque se acumula y se aplica al empezar
       try { call('play'); } catch (e) { release(); return fail(e.message); }
-      waitResume(release);
+      waitResume(function () { release(); if (fix >= 0 && token === P.token) selectAudio(fix, true); });
       setState(''); startTimers(); showOsd();
       if (P.notice) setTimeout(function () { if (token === P.token) flash(P.notice); }, 1500);
     };
@@ -233,8 +236,8 @@
       if (all[i].type !== 'AUDIO') continue;
       var x = {};
       try { x = JSON.parse(all[i].extra_info) || {}; } catch (_) {}
-      var ch = parseInt(x.channels, 10), codec = String(x.fourCC || '');
-      var label = YF.lang(x.language) + (ch === 8 ? ' 7.1' : ch === 6 ? ' 5.1' : ch === 2 ? ' estéreo' : ch === 1 ? ' mono' : '') + (codec ? ' · ' + codec.toUpperCase() : '');
+      var ch = parseInt(x.channels, 10), codec = YF.codecName(x.fourCC);
+      var label = YF.lang(x.language) + (ch === 8 ? ' 7.1' : ch === 6 ? ' 5.1' : ch === 2 ? ' estéreo' : ch === 1 ? ' mono' : '') + (codec ? ' · ' + codec : '');
       P.audio.push({ index: all[i].index, lang: YF.lang(x.language), codec: codec, label: label });
     }
     showAudio();
