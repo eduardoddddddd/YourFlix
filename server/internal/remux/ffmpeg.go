@@ -226,7 +226,9 @@ func (m *Manager) ffmpegArgs(path string, in *Info, v Variant, plan *Plan, start
 		args = append(args, "-force_key_frames", "expr:gte(t,n_forced*"+strconv.Itoa(int(SegmentTarget))+")")
 	}
 	if v.Audio >= 0 {
-		args = append(args, "-c:a", "aac", "-ac", "2", "-b:a", "192k")
+		// El codificador AAC por defecto (twoloop) es el cuello de botella del modo copia; «fast»
+		// lo deja en ~60× tiempo real con calidad de sobra a 192 kb/s.
+		args = append(args, "-c:a", "aac", "-aac_coder", "fast", "-ac", "2", "-b:a", "192k")
 	}
 	args = append(args, "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
 		"-output_ts_offset", secs(tsOffset), "-max_muxing_queue_size", "4096",

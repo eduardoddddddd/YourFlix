@@ -44,3 +44,22 @@ En cascada: (0) misma huella ya identificada en otra fuente → mismo título (c
 - Ocupa 986 GB de los 1,86 TB de C:. Avisar antes de añadir más fuentes grandes, y contar con la carpeta de optimizados (fase 4).
 - Para sincronizar con los discos originales hay que repetir la copia con `robocopy` (ver `docs/ENTORNO-ALLY.md`) y re-escanear.
 - Dato nuevo para §3.6 del plan: la lectura desde los SSD USB iba a ≈110–200 MB/s en el Ally; la copia local evita ese cuello en servicio.
+
+## ADR-006 · Remux en vivo solo para el cliente web; la TV sigue con reproducción directa — 24-10-2026
+
+**Contexto.** El usuario quiere ver la colección desde cualquier navegador de casa (iPhone, Android, Mac, PC con Windows) con el mismo servidor del ROG Ally. Medido en la colección real (496 archivos): 480 MKV y 16 AVI; vídeo H.264 8 bits 267, HEVC 8 bits 28, HEVC Main10 175, MPEG-4 ASP/XviD 26; audio AC3 442 pistas, E-AC3 159, AAC 221, MP3 6, DTS 9. Solo 53 archivos se podrían reproducir tal cual en un navegador: Safari no lee MKV, ningún navegador decodifica AC3/E-AC3 en Chrome/Firefox, Firefox no decodifica HEVC y nadie decodifica XviD. ADR-001 decía «sin transcodificación en vivo»; eso sigue valiendo para la TV.
+
+**Decisión.**
+- La TV no cambia: archivo tal cual por `/stream` (ADR-001). Las rutas nuevas son añadidas y la TV no las usa.
+- El navegador decide en el cliente (`canPlayType` / `MediaSource.isTypeSupported`): **directo** con `/stream` si admite contenedor y códecs de la pista por defecto (Chrome ya abre MKV con H.264 + AAC); si no, **HLS con segmentos fMP4** (Safari nativo; hls.js 1.5.20 copiado en `web/vendor/` en el resto).
+- **Modo copia** (H.264 de 8 bits, y HEVC si el navegador lo decodifica): vídeo copiado (`hvc1` para Safari) y audio a **AAC estéreo 192 kb/s** (mezcla de 5.1 de ffmpeg, codificador AAC `fast`).
+- **XviD, HEVC en navegadores sin HEVC (Firefox) y H.264 de 10 bits: se recodifican a H.264** (`h264_amf` si funciona en el equipo, comprobado al arrancar; si no, `libx264 veryfast`), como mucho 1080p y 8 bits; el HDR se pasa a SDR con `zscale`+`tonemap` si el ffmpeg los tiene. `--video-encoder off` lo desactiva y la web lo explica («se puede ver en la TV»). Motivo: los 26 XviD son SD (recodificar cuesta poco) y en Safari, Chrome y Edge con aceleración el HEVC va copiado; avisar dejaría sin ver en Firefox un tercio de la colección.
+- **Saltos en cualquier punto:** la lista es VOD con toda la duración. En modo copia los cortes son fotogramas clave reales sacados del índice Cues del MKV (instantáneo; ffprobe solo para otros contenedores); al recodificar, cortes cada 6 s con fotograma clave forzado. Cada segmento se genera bajo demanda: ffmpeg escribe un MP4 fragmentado por su salida estándar desde el segmento pedido (`-ss` + `-copyts` + `frag_discont` + `negative_cts_offsets`, marcas de tiempo del archivo +10 s) y el servidor lo corta según el plan. Si el reproductor salta lejos se relanza ffmpeg en ese segmento; los segmentos de ejecuciones distintas encajan porque conservan la línea de tiempo del archivo.
+- **Recursos:** como mucho 2 conversiones a la vez (`--remux-jobs`; una por reproductor); ffmpeg se frena cuando va 8 segmentos por delante (el servidor deja de leer la tubería, sin señales de proceso, así que vale en Windows) y se mata si el reproductor deja de pedir 60 s o se cierra. Caché temporal en `DATOS/remux` (se vacía al arrancar; tope `--remux-cache-gb`, 20 GB; se borra lo que lleva 6 h sin usarse).
+- **Subtítulos:** los de texto, en WebVTT (`/files/{id}/vtt/{sid}`) en un `<track>`; así se ven también en la pantalla completa nativa del iPhone, donde no se puede dibujar HTML encima del vídeo.
+
+**Consecuencias.**
+- El Ally gasta CPU mientras alguien ve algo en el navegador: casi nada en modo copia (solo audio), bastante al recodificar. Un 4K HEVC 10 bits recodificado por software puede no llegar a tiempo real en el Z1: sin probar.
+- Los saltos en HLS tardan algo más que en directo (ffmpeg arranca en el punto nuevo); con recodificación, unos segundos.
+- Sin DRM, sin acceso desde fuera de casa (la web es solo LAN, como la API) y sin elegir calidad: no se promete nada de eso.
+- Pendiente de probar en dispositivos reales contra el Ally: iPhone (Safari nativo, HEVC copiado, pantalla completa con subtítulos), Android (Chrome), Mac (Safari y Chrome), Windows (Edge/Chrome con HEVC y Firefox recodificando); que `h264_amf` respete los fotogramas clave forzados; carga de CPU y tiempos de salto con los archivos de decenas de GB.

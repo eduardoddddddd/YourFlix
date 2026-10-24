@@ -21,7 +21,18 @@ $Y titles                                        # catálogo
 $Y --tmdb-token-file secrets/tmdb.token serve    # API en :8787; re-escanea e identifica cada 30 min
 ```
 
-Compilar para el ROG Ally: `cd server && GOOS=windows GOARCH=amd64 go build -o yourflix.exe ./cmd/yourflix`; poner `ffprobe.exe` junto al ejecutable. API: [docs/API.md](docs/API.md).
+Compilar para el ROG Ally: `cd server && GOOS=windows GOARCH=amd64 go build -o yourflix.exe ./cmd/yourflix`; poner `ffprobe.exe` y `ffmpeg.exe` junto al ejecutable (o `--ffprobe` / `--ffmpeg`). API: [docs/API.md](docs/API.md).
+
+**Web** ([ADR-006](docs/DECISIONES.md#adr-006--remux-en-vivo-solo-para-el-cliente-web-la-tv-sigue-con-reproducción-directa--24-10-2026)): `serve` sirve también la carpeta `web/` en `http://IP:8787/` para cualquier navegador de la red local (la busca junto al ejecutable o en la carpeta actual; si no, `--web RUTA`). Lo que el navegador no lee tal cual lo convierte ffmpeg al vuelo en HLS:
+
+```bash
+$Y serve --remux-jobs 2 --remux-cache-gb 20 --video-encoder auto   # valores por defecto
+# --video-encoder auto|h264_amf|libx264|off  (off: XviD y HEVC sin soporte no se ven en el navegador)
+# --remux-jobs 0                             (solo reproducción directa)
+tools/web-demo/make_demo.sh /tmp/demo       # biblioteca de prueba generada con ffmpeg
+node tools/web-demo/e2e.mjs http://localhost:8787 /tmp/capturas   # recorrido con Chromium (Playwright)
+node --test web/tests/*.test.js
+```
 
 TMDB: token de lectura en `secrets/tmdb.token` (fuera de Git; origen: nota «TMDB API» de Joplin), o variables `TMDB_ACCESS_TOKEN` / `TMDB_API_KEY`. Sin token, todo funciona salvo la identificación de lo nuevo.
 
@@ -42,6 +53,13 @@ cd tv && "$TIZEN" build-web -e "tests/*" -- . && "$TIZEN" package -t wgt -s Cine
 En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados como la TV); en la tele no hace nada. Teclas en el Mac: flechas, Intro, Esc (Atrás), F/R (⏩/⏪), G (verde), Y (amarillo).
 
 ## Estado
+
+**24-10-2026 — cliente web (rama `fase-web/cliente`, PR a `main` sin fusionar).** [ADR-006](docs/DECISIONES.md): remux en vivo solo para la web; la TV sigue con el archivo tal cual (ADR-001) y no se ha tocado `tv/`.
+
+- **Hecho:** `web/` (JS sin compilar, sin CDN; hls.js 1.5.20 copiado con su licencia) servida en `/` con la misma protección solo LAN. Inicio (Seguir viendo, Añadidas, Mejor valoradas, Series, géneros), Películas y Series con orden y género, series con temporadas y capítulos, Búsqueda, Ficha (distintivos, cómo se va a reproducir en *este* navegador, reanudar, copias) y Reproductor (barra con saltos, ±10 s, pista de audio, subtítulos, pantalla completa, siguiente capítulo, teclado y toques). Sin soporte de origen a la vista. Progreso con el mismo `PUT /progress`, así que «Seguir viendo» es común con la TV. Servidor: paquete `remux` (índice de fotogramas clave del MKV, ffmpeg por tubería, segmentos fMP4 bajo demanda, salto = ffmpeg relanzado en ese segmento, 2 conversiones a la vez, freno cuando va por delante, parada a los 60 s sin peticiones, caché en `DATOS/remux`), rutas nuevas `/remux`, `/files/{id}/hls/…` y `/files/{id}/vtt/{sid}` ([docs/API.md](docs/API.md)), opciones `--web`, `--remux-jobs`, `--remux-cache-gb`, `--video-encoder`. Decisión XviD/HEVC sin soporte: **se recodifican a H.264** (`h264_amf` si funciona, si no `libx264`; `off` para avisar en vez de convertir).
+- **Probado en la nube (Linux, ffmpeg 6.1, sin LAN, sin TV ni archivos reales):** `go test ./...` y `go vet ./...` (también `GOOS=windows`), con `-race` en `remux` y `api`; los 13 tests de `tv/` y los de `web/`; `node --check` de todos los JS. Remux real con ffmpeg sobre vídeos generados: MKV H.264 + AC3 5.1, MKV HEVC Main10 + E-AC3 y AVI XviD + MP3 (y HEVC recodificado para navegadores sin HEVC); ffprobe confirma códecs (h264/hevc + AAC estéreo), que cada segmento decodifica limpio y que el segmento de un salto a la mitad empieza exactamente en su corte (vídeo ±2 ms; audio sin hueco); el demuxer HLS de ffmpeg lee la lista entera por HTTP y la duración cuadra. Índice Cues del MKV = fotogramas clave de ffprobe. Recorrido en Chromium (Playwright, escritorio y móvil) contra el servidor con la biblioteca de `tools/web-demo/make_demo.sh`: directo (MP4), HLS copiado (MKV AC3) con cambio de pista y subtítulos internos, HLS recodificado (HEVC 10 bits y XviD), salto a la mitad en todos, subtítulos externos, progreso guardado, ffmpeg parado al salir, sin errores de JavaScript.
+- **Sin probar (para la sesión del Ally):** iPhone (Safari con HLS nativo, HEVC copiado, pantalla completa nativa con subtítulos), Android (Chrome), Mac (Safari y Chrome) y Windows (Edge/Chrome con HEVC por hardware; Firefox recodificando) contra `192.168.1.13:8787`; `h264_amf` en el Z1 (detección, fotogramas clave forzados, calidad) y CPU/tiempo real con 4K HEVC 10 bits recodificado; saltos y caché con los archivos reales de decenas de GB; HDR copiado en Safari; que la regla del firewall deje entrar a los móviles igual que a la TV.
+- **Siguiente paso:** revisar y fusionar el PR (choca solo en `main.go` si la administración también lo toca), compilar en el Ally con `ffmpeg.exe` junto al ejecutable, arrancar `serve` desde la raíz del repo (para que encuentre `web/`) y probar en los cuatro tipos de dispositivo.
 
 **24-10-2026 — app 0.3.1 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues).
 

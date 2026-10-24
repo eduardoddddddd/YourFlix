@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b10">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="YourFlix">
+  <title>YourFlix</title>
+  <link rel="icon" href="img/logo.png">
+  <link rel="apple-touch-icon" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header id="top">
+    <a class="brand" href="#/" aria-label="YourFlix, inicio"><img src="img/logo.png" alt=""><span>Your<b>Flix</b></span></a>
+    <nav id="nav" aria-label="Secciones">
+      <a href="#/" data-nav="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>Inicio</span></a>
+      <a href="#/peliculas" data-nav="movies"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg><span>Películas</span></a>
+      <a href="#/series" data-nav="series"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg><span>Series</span></a>
+      <a href="#/buscar" data-nav="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><span>Buscar</span></a>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <div id="toast" class="hidden" role="status" aria-live="polite"></div>
+  <noscript><p class="noscript">YourFlix necesita JavaScript.</p></noscript>
+
+  <script src="vendor/hls.min.js" defer></script>
+  <script src="js/util.js" defer></script>
+  <script src="js/playback.js" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/player.js" defer></script>
+  <script src="js/screens.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

@@ -19,7 +19,7 @@ Ver en la tele, desde el sofá y con el mando, las películas y series de **vari
 
 ### Lo que NO es (v1)
 
-- No es un Plex/Jellyfin: sin usuarios remotos, sin acceso desde fuera de casa, sin transcodificación en tiempo real en v1, sin DRM, sin descargas.
+- No es un Plex/Jellyfin: sin usuarios remotos, sin acceso desde fuera de casa, sin transcodificación en tiempo real para la TV (la web sí convierte en vivo: ADR-006), sin DRM, sin descargas.
 - No se publica nada en Internet. El catálogo público `cine-t7-catalogo` sigue siendo independiente; YourFlix solo **lee** sus datos como semilla.
 
 ### Por qué no usar Jellyfin directamente
@@ -420,6 +420,7 @@ Transcodificación en vivo (HLS) · varios perfiles de usuario · capítulos MKV
 ### Peticiones del usuario (24-10-2026), pendientes de plan
 
 5. **Cliente web** para ver la colección desde cualquier navegador (móvil, Mac, PC) en la LAN, sin tocar la app de Tizen. Medido: de 496 archivos, 480 son MKV; solo 53 llevan H.264 de 8 bits con audio que lee un navegador; 214 solo necesitan convertir el audio (AC3/E-AC3/DTS → AAC) y 229 tienen vídeo HEVC/10 bits/XviD. Exige remux en vivo (vídeo copiado y audio a AAC, HLS o fMP4) y, para XviD, recodificar (AMF del Ally). Cambia la regla «sin transcodificación en vivo» (ADR-001): necesita ADR.
+   > **24-10-2026: implementado en la rama `fase-web/cliente` (PR a `main`), [ADR-006](docs/DECISIONES.md).** El mismo servidor sirve `web/` en `/`. Directo cuando el navegador puede; si no, HLS fMP4 con vídeo copiado y audio a AAC; XviD, HEVC sin soporte (Firefox) y H.264 de 10 bits se recodifican a H.264 (`h264_amf` o `libx264`). Lista VOD completa, segmentos bajo demanda, ffmpeg relanzado en cada salto, 2 conversiones a la vez, caché en `DATOS/remux`. Probado en la nube con vídeos generados y Chromium; falta probar en iPhone, Android, Mac y Windows contra el Ally.
 6. **Servidor permanente en el Ally** (servicio de Windows) que sirva la API, la app web y la administración.
 7. **Interfaz de administración** del servidor (es la fase 5).
 8. **Audio y subtítulos en la TV:** hoy solo con los botones de color (verde y amarillo), que el mando Smart Remote de The Serif no tiene a la vista. Hacen falta botones en pantalla en el reproductor.

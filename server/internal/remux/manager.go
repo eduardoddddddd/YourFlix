@@ -71,6 +71,7 @@ type Manager struct {
 	lastUse map[string]time.Time
 	stop    chan struct{}
 	closed  bool
+	starts  int // ejecuciones de ffmpeg lanzadas (para las pruebas)
 }
 
 func New(cfg Config) *Manager {
@@ -398,6 +399,11 @@ func (m *Manager) wait(ctx context.Context, p *prepared, session string, n int, 
 		// La ejecución terminó o pasó de largo sin dar el segmento (p. ej. un corte sin
 		// fotograma clave al recodificar): una nueva empieza justo en él.
 		if (done || (!isInit && cur > n)) && !exists(final) {
+			// Otra petición de la misma sesión ya relanzó ffmpeg: si esa ejecución lo dará, se espera a ella.
+			if nj := m.current(p, session); nj != nil && nj != j && nj.covers(n, isInit) {
+				j = nj
+				continue
+			}
 			if restarts >= 2 {
 				if jerr != nil {
 					return "", jerr
@@ -420,6 +426,19 @@ func (m *Manager) wait(ctx context.Context, p *prepared, session string, n int, 
 	}
 }
 
+func (m *Manager) current(p *prepared, session string) *job {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.jobs[jobKey(p, session)]
+}
+
+// covers: la ejecución sigue viva y dará pronto el segmento n (cualquiera da el de inicio).
+func (j *job) covers(n int, isInit bool) bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return !j.done && (isInit || (n >= j.start && n <= j.cur+lookahead))
+}
+
 func (m *Manager) touch(dir string) {
 	m.mu.Lock()
 	m.lastUse[dir] = time.Now()
@@ -440,26 +459,28 @@ func (m *Manager) want(p *prepared, session string, n int) {
 
 // ensureJob: si la ejecución de esta sesión dará pronto el segmento need, se reutiliza; si no,
 // se relanza ffmpeg en need. requested es lo que el reproductor ha pedido de verdad.
+// Todo bajo m.mu: hls.js pide a la vez el segmento de inicio y el primero, y las dos
+// peticiones no deben lanzar dos ffmpeg.
 func (m *Manager) ensureJob(p *prepared, session string, requested, need int) (*job, error) {
 	m.mu.Lock()
-	j := m.jobs[jobKey(p, session)]
-	m.mu.Unlock()
-	if j != nil {
-		j.mu.Lock()
-		ok := !j.done && need >= j.start && need <= j.cur+lookahead
-		j.mu.Unlock()
-		if ok {
+	defer m.mu.Unlock()
+	if j := m.jobs[jobKey(p, session)]; j != nil {
+		if j.covers(need, false) {
 			j.request(requested)
 			return j, nil
 		}
 	}
-	return m.restart(p, session, need)
+	return m.restartLocked(p, session, need)
 }
 
 // restart lanza ffmpeg desde el segmento start (matando la ejecución anterior de la sesión).
 func (m *Manager) restart(p *prepared, session string, start int) (*job, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.restartLocked(p, session, start)
+}
+
+func (m *Manager) restartLocked(p *prepared, session string, start int) (*job, error) {
 	if m.closed {
 		return nil, errors.New("servidor parándose")
 	}
@@ -493,6 +514,7 @@ func (m *Manager) restart(p *prepared, session string, start int) (*job, error) 
 	ctx, cancel := context.WithCancel(context.Background())
 	j := &job{m: m, p: p, start: start, cur: start, wanted: start, lastReq: time.Now(), cancel: cancel, changed: make(chan struct{})}
 	m.jobs[key] = j
+	m.starts++
 	m.cfg.Log.Printf("web: ffmpeg %s %s desde el segmento %d (%s)", p.src.ID, p.v, start, clock(p.plan.Starts[start]))
 	go j.run(ctx)
 	return j, nil

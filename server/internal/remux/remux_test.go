@@ -447,3 +447,31 @@ func TestRemuxWholePlaylistOverHTTP(t *testing.T) {
 		t.Fatalf("duración por HLS %.2f, el archivo dura 150", d)
 	}
 }
+
+// hls.js pide a la vez el segmento de inicio y el primero: una sola ejecución de ffmpeg,
+// también si el primero es anterior al «from» de la lista.
+func TestRemuxParallelStart(t *testing.T) {
+	needFFmpeg(t)
+	m := newManager(t, 2)
+	src := Source{ID: "f1", Fingerprint: "abc", Path: filepath.Join(media, "h264_ac3.mkv")}
+	v := Variant{Audio: 1, Video: ModeCopy}
+	ctx := context.Background()
+	for _, c := range []struct {
+		session              string
+		from, seg, maxStarts int
+	}{{"p1", 5, 5, 1}, {"p2", 6, 5, 2}} {
+		before := m.starts
+		errs := make(chan error, 2)
+		go func() { _, err := m.Init(ctx, src, v, c.session, c.from); errs <- err }()
+		go func() { _, err := m.Segment(ctx, src, v, c.session, c.seg); errs <- err }()
+		for i := 0; i < 2; i++ {
+			if err := <-errs; err != nil {
+				t.Fatalf("%s: %v", c.session, err)
+			}
+		}
+		if n := m.starts - before; n > c.maxStarts {
+			t.Fatalf("%s: %d ejecuciones de ffmpeg, como mucho %d", c.session, n, c.maxStarts)
+		}
+		m.Stop(src, v, c.session)
+	}
+}
