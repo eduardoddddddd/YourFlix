@@ -105,6 +105,8 @@ func main() {
 		err = a.match(args[1:])
 	case "titles":
 		err = a.titles(args[1:])
+	case "admin":
+		err = a.adminCmd(args[1:])
 	default:
 		usage()
 		os.Exit(2)
@@ -128,6 +130,7 @@ func usage() {
   yourflix titles [--q TEXTO] [--kind movie|series] [--pending]
   yourflix identify [--retry]     (TMDB para lo que no está en la semilla)
   yourflix match ID_FICHA --tmdb ID   (elegir la ficha a mano; queda bloqueada)
+  yourflix admin password         (contraseña de la web de administración, /admin/)
 
 Opciones globales: --data (o YOURFLIX_DATA), --ffprobe (o YOURFLIX_FFPROBE), --ffmpeg (o YOURFLIX_FFMPEG), --profile,
   --tmdb-token-file (o YOURFLIX_TMDB_TOKEN_FILE, TMDB_ACCESS_TOKEN, TMDB_API_KEY)
@@ -282,6 +285,8 @@ func (a *app) source(args []string) error {
 }
 
 func (a *app) scanOne(ctx context.Context, s *store.Source, verbose bool) error {
+	scanMu.Lock() // un escaneo a la vez, también con los que lanza la admin
+	defer scanMu.Unlock()
 	logf := func(string, ...any) {}
 	if verbose {
 		logf = func(f string, v ...any) { fmt.Printf(f+"\n", v...) }
@@ -396,7 +401,16 @@ func (a *app) serve(args []string) error {
 	defer stop()
 	go a.scanLoop(ctx, *rescan)
 	hs := &http.Server{Addr: *addr, Handler: web.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	go func() { <-ctx.Done(); hs.Shutdown(context.Background()) }()
+	hs.Handler = a.withAdmin(hs.Handler, prof, stop) // stop: reinicio desde la admin (iniciar.cmd lo relanza)
+	go func() {
+		<-ctx.Done()
+		// Las descargas de vídeo pueden durar horas: 5 s de cortesía y se cierran.
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if hs.Shutdown(sctx) != nil {
+			hs.Close()
+		}
+	}()
 	log.Printf("YourFlix %s escuchando en %s · datos en %s · perfil %s · ffprobe %s", version, *addr, a.dataDir, prof.ID, a.ffprobe)
 	if web.Dir != "" {
 		log.Printf("Web en http://<esta IP>%s/ (carpeta %s) · conversiones simultáneas: %d · ffmpeg %s", *addr, web.Dir, *remuxJobs, a.ffmpeg)

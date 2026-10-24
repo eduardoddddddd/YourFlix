@@ -1,0 +1,2 @@
+tools/ally/*.cmd text eol=crlf
+web/vendor/** -text

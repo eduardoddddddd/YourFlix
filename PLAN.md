@@ -250,6 +250,8 @@ POST /api/v1/admin/seed · GET /admin/pending · PUT /admin/titles/{id}/match
 POST /api/v1/admin/optimize/{fileId} · GET /admin/jobs · GET /admin/log
 ```
 
+> Fase 5: la administración quedó en `/admin/api/…`, aparte de `/api/v1` (ADR-007; contrato en `docs/API.md`).
+
 El contrato se congela al final de la fase 1A con fixtures JSON reales. A partir de ahí servidor y TV se desarrollan **en paralelo**: la TV contra un servidor simulado (`yourflix --mock` o fixtures estáticos).
 
 ---
@@ -422,7 +424,7 @@ Transcodificación en vivo (HLS) · varios perfiles de usuario · capítulos MKV
 5. **Cliente web** para ver la colección desde cualquier navegador (móvil, Mac, PC) en la LAN, sin tocar la app de Tizen. Medido: de 496 archivos, 480 son MKV; solo 53 llevan H.264 de 8 bits con audio que lee un navegador; 214 solo necesitan convertir el audio (AC3/E-AC3/DTS → AAC) y 229 tienen vídeo HEVC/10 bits/XviD. Exige remux en vivo (vídeo copiado y audio a AAC, HLS o fMP4) y, para XviD, recodificar (AMF del Ally). Cambia la regla «sin transcodificación en vivo» (ADR-001): necesita ADR.
    > **24-10-2026: implementado en la rama `fase-web/cliente` (PR a `main`), [ADR-006](docs/DECISIONES.md).** El mismo servidor sirve `web/` en `/`. Directo cuando el navegador puede; si no, HLS fMP4 con vídeo copiado y audio a AAC; XviD, HEVC sin soporte (Firefox) y H.264 de 10 bits se recodifican a H.264 (`h264_amf` o `libx264`). Lista VOD completa, segmentos bajo demanda, ffmpeg relanzado en cada salto, 2 conversiones a la vez, caché en `DATOS/remux`. Probado en la nube con vídeos generados y Chromium; falta probar en iPhone, Android, Mac y Windows contra el Ally.
 6. **Servidor permanente en el Ally** (servicio de Windows) que sirva la API, la app web y la administración.
-7. **Interfaz de administración** del servidor (es la fase 5).
+7. **Interfaz de administración** del servidor (es la fase 5). → **Hecha en la rama `fase-5/admin`** (24-10-2026, ADR-007): web en `/admin/` con fuentes (explorador de carpetas del servidor, etiqueta, tipo, exclusiones, pausar, quitar, escaneo con progreso en vivo), catálogo (pendientes con candidatos de TMDB, emparejado con un clic que bloquea la ficha, búsqueda manual, identificar), estado (versión, encendido, ffmpeg/ffprobe, discos, escaneos, registro) y compatibilidad. Contraseña con hash y sesión; `localhost` sin contraseña. API en `docs/API.md` («API de administración»). Falta montarla en `main.go` (dos líneas, ver `server/cmd/yourflix/admin.go`) y probarla en el Ally.
 8. **Audio y subtítulos en la TV:** hoy solo con los botones de color (verde y amarillo), que el mando Smart Remote de The Serif no tiene a la vista. Hacen falta botones en pantalla en el reproductor.
 
 > **Actualización 24-10-2026:** el trabajo continúa en el propio Ally (Wi-Fi `192.168.1.13` por ahora; cable e IP nueva después). Estado real y relevo: `README.md` («Estado») y `docs/ENTORNO-ALLY.md`.

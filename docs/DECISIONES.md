@@ -63,3 +63,21 @@ En cascada: (0) misma huella ya identificada en otra fuente → mismo título (c
 - Los saltos en HLS tardan algo más que en directo (ffmpeg arranca en el punto nuevo); con recodificación, unos segundos.
 - Sin DRM, sin acceso desde fuera de casa (la web es solo LAN, como la API) y sin elegir calidad: no se promete nada de eso.
 - Pendiente de probar en dispositivos reales contra el Ally: iPhone (Safari nativo, HEVC copiado, pantalla completa con subtítulos), Android (Chrome), Mac (Safari y Chrome), Windows (Edge/Chrome con HEVC y Firefox recodificando); que `h264_amf` respete los fotogramas clave forzados; carga de CPU y tiempos de salto con los archivos de decenas de GB.
+
+## ADR-007 · Administración web en `/admin/`, aparte de `/api/v1` — 24-10-2026
+
+> Numerada 007 porque la 006 queda para el remux en vivo del cliente web (petición 5 del plan), que se hace a la vez en otra rama. Si al fusionar no existe, se puede renumerar.
+
+**Contexto.** PLAN.md §6 esbozaba los endpoints de administración dentro de `/api/v1/admin/…`. Pero `/api/v1` tiene CORS abierto y no tiene sesión (lo usan la TV y la web de la colección), y la administración sí necesita rutas de disco, contraseña y protección CSRF.
+
+**Decisión.**
+- Paquete propio `server/internal/admin`, montado como un `http.Handler` en `/admin/` delante del resto del servidor: la web estática en `/admin/` (carpeta `admin/` del repo, servida desde disco, sin CDN) y la API en `/admin/api/…` (contrato en `docs/API.md`). `/api/v1` no cambia.
+- Acceso: solo LAN; desde `localhost` (IP de bucle **y** `Host` local) sin contraseña; desde otro equipo, contraseña con hash PBKDF2-SHA256 de la biblioteca estándar (sin dependencias nuevas, ADR-002) y cookie de sesión en memoria. La primera contraseña solo desde `localhost`, la CLI (`yourflix admin password`) o `YOURFLIX_ADMIN_PASSWORD`. CSRF: JSON obligatorio + `Origin` + token de sesión en `X-CSRF-Token`.
+- Los escaneos e identificaciones de la admin van en una cola de un solo trabajo, con progreso por SSE, y comparten un candado con el re-escaneo periódico de `serve`.
+- La tabla `scan_runs` (historial de escaneos de la admin) la crea `store.InitAdmin`, sin tocar el esquema común.
+
+**Consecuencias.**
+- La API de administración devuelve rutas (como permite `AGENTS.md` para el explorador), pero solo a la admin; la TV recibe 401.
+- Reiniciar el servidor cierra las sesiones remotas (la de `localhost` se recrea sola).
+- El binario busca la web en `YOURFLIX_ADMIN_WEB`, `admin/` junto al ejecutable, `../admin` (para `private/yourflix.exe` en el repo) y `./admin`. El instalador del servicio de Windows (fase 5) debe copiar `admin/` junto al `.exe`.
+- El emparejamiento de la TV por código (§3.3, fase 6) mostrará su código en esta admin.
