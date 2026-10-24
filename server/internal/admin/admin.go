@@ -40,6 +40,9 @@ type Config struct {
 	Ring    *Ring       // últimas líneas del registro (puede ser nil)
 	Lock    sync.Locker // compartido con el re-escaneo periódico de serve (puede ser nil)
 	Started time.Time
+	// Restart cierra el servidor con normalidad; iniciar.cmd lo vuelve a lanzar (con el
+	// binario nuevo si se ha cambiado). Nil = no se puede reiniciar desde la admin.
+	Restart func()
 	// Roots sustituye a las unidades/raíz del explorador (tests).
 	Roots func() []Place
 }
@@ -111,6 +114,7 @@ func (a *Admin) routes() {
 	auth("GET /admin/api/status", a.status)
 	auth("GET /admin/api/compat", a.compatSummary)
 	auth("GET /admin/api/log", a.logLines)
+	auth("POST /admin/api/restart", a.restart)
 	m.HandleFunc("/admin/api/", func(w http.ResponseWriter, r *http.Request) { writeError(w, http.StatusNotFound, "no existe") })
 	// Web estática (sin datos: el acceso lo controla la API)
 	m.HandleFunc("/admin/", a.static)
@@ -249,6 +253,18 @@ func (a *Admin) login(w http.ResponseWriter, r *http.Request) {
 	setCookie(w, s)
 	a.cfg.Log.Printf("admin: sesión iniciada desde %s", ip)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf": s.csrf})
+}
+
+// restart: la tarea del Ally corre en otra sesión de Windows y el usuario no puede matar el
+// proceso sin ser administrador; así el servidor se cierra solo y iniciar.cmd lo relanza.
+func (a *Admin) restart(w http.ResponseWriter, r *http.Request) {
+	if a.cfg.Restart == nil {
+		writeError(w, http.StatusNotImplemented, "este servidor no se puede reiniciar desde aquí")
+		return
+	}
+	a.cfg.Log.Printf("admin: reinicio pedido desde %s", remoteIP(r))
+	writeJSON(w, http.StatusAccepted, map[string]any{"restarting": true})
+	go func() { time.Sleep(500 * time.Millisecond); a.cfg.Restart() }()
 }
 
 // tooMany cuenta un intento de contraseña y responde 429 si esa IP está bloqueada.

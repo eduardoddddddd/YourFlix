@@ -623,6 +623,22 @@
 
   // ---------- Estado ----------
 
+  // Reiniciar: el servidor se cierra y la tarea del Ally lo relanza (con el binario nuevo si se ha cambiado).
+  // Corta lo que se esté viendo en la TV.
+  function restartServer() {
+    modal('Reiniciar el servidor', el('p', { text: 'Se cortará lo que se esté viendo en la TV o en la web. El servidor vuelve en unos segundos.' }), [
+      { text: 'Cancelar' },
+      { text: 'Reiniciar', cls: 'danger', click: function () {
+        api('POST', 'restart', {}).then(function () {
+          setMain(el('div', { class: 'card' }, el('h1', { text: 'Reiniciando…' }), el('p', { class: 'muted', text: 'Esta página se recargará cuando el servidor responda.' })));
+          var tries = 0, poll = setInterval(function () {
+            if (++tries > 60) { clearInterval(poll); return; }
+            fetch('/api/v1/ping', { cache: 'no-store' }).then(function (r) { if (r.ok && tries > 2) { clearInterval(poll); location.reload(); } }).catch(function () {});
+          }, 1000);
+        }).catch(fail);
+      } }]);
+  }
+
   function viewStatus() {
     api('GET', 'status').then(function (d) {
       function fact(k, v, cls) { return el('div', { class: 'card fact' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (cls || '') }, v)); }
@@ -665,7 +681,8 @@
       } });
       setMain(
         el('div', { class: 'head' }, el('div', null, el('h1', { text: 'Estado del servidor' }), el('p', { text: 'Encendido desde ' + fmtDate(d.startedAt) })),
-          el('div', { class: 'actions' }, el('button', { class: 'btn', type: 'button', text: '⟳ Actualizar', onclick: viewStatus }))),
+          el('div', { class: 'actions' }, el('button', { class: 'btn', type: 'button', text: '⟳ Actualizar', onclick: viewStatus }),
+            el('button', { class: 'btn danger', type: 'button', text: '↻ Reiniciar servidor', onclick: restartServer }))),
         facts,
         el('h2', { text: 'Discos' }), disks,
         el('h2', { text: 'Fuentes' }), srcTable,

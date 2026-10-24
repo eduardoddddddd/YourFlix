@@ -731,6 +731,24 @@ func TestReviewHardening(t *testing.T) {
 			t.Fatalf("carpeta de red: %d", w.Code)
 		}
 	}
+
+	// Reiniciar: solo con sesión de admin y CSRF; llama a Restart.
+	if w := c.do("POST", "/admin/api/restart", map[string]any{}); w.Code != http.StatusNotImplemented {
+		t.Fatalf("reiniciar sin Restart: %d", w.Code)
+	}
+	restarted := make(chan bool, 1)
+	e.a.cfg.Restart = func() { restarted <- true }
+	if w := e.client(tv).do("POST", "/admin/api/restart", map[string]any{}); w.Code != http.StatusUnauthorized && w.Code != http.StatusForbidden {
+		t.Fatalf("reiniciar desde la TV: %d", w.Code)
+	}
+	if w := c.do("POST", "/admin/api/restart", map[string]any{}); w.Code != http.StatusAccepted {
+		t.Fatalf("reiniciar: %d", w.Code)
+	}
+	select {
+	case <-restarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("no se llamó a Restart")
+	}
 }
 
 func TestPasswordHash(t *testing.T) {

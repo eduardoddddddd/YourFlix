@@ -7,6 +7,6 @@ cd /d "%~dp0"
 if exist data\yourflix.log for %%F in (data\yourflix.log) do if %%~zF GTR 10485760 move /y data\yourflix.log data\yourflix.old.log >nul
 echo %date% %time% arranque >> data\yourflix.log
 yourflix.exe --data "%~dp0data" --tmdb-token-file "%~dp0secrets\tmdb.token" serve >> data\yourflix.log 2>&1
-echo %date% %time% el servidor se ha parado (codigo %errorlevel%); se relanza en 10 s >> data\yourflix.log
-timeout /t 10 /nobreak >nul
+echo %date% %time% el servidor se ha parado (codigo %errorlevel%); se relanza en 3 s >> data\yourflix.log
+timeout /t 3 /nobreak >nul
 goto loop

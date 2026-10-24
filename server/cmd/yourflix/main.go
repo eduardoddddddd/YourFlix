@@ -368,8 +368,16 @@ func (a *app) serve(args []string) error {
 	defer stop()
 	go a.scanLoop(ctx, *rescan)
 	hs := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	hs.Handler = a.withAdmin(hs.Handler, prof)
-	go func() { <-ctx.Done(); hs.Shutdown(context.Background()) }()
+	hs.Handler = a.withAdmin(hs.Handler, prof, stop) // stop: reinicio desde la admin (iniciar.cmd lo relanza)
+	go func() {
+		<-ctx.Done()
+		// Las descargas de vídeo pueden durar horas: 5 s de cortesía y se cierran.
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if hs.Shutdown(sctx) != nil {
+			hs.Close()
+		}
+	}()
 	log.Printf("YourFlix %s escuchando en %s · datos en %s · perfil %s · ffprobe %s", version, *addr, a.dataDir, prof.ID, a.ffprobe)
 	if err := hs.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err

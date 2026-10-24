@@ -94,7 +94,12 @@ Sustituye al `serve` lanzado a mano desde el worktree (que se para al cerrar la 
 | `…\iniciar.cmd`, `parar.cmd`, `instalar.cmd`, `instalar-servicio.ps1` | Copias de `tools/ally/`. `instalar.cmd` (doble clic en el Ally) pide permiso de administrador y lanza el `.ps1`, que deja su resultado en `instalar.log` |
 
 - **Arranque:** tarea programada «YourFlix» al encender, con el usuario de Windows en modo S4U (sin iniciar sesión ni guardar contraseña). Primero se hizo como SYSTEM, pero entonces solo un administrador puede arrancarla o pararla. `iniciar.cmd` relanza el servidor a los 10 s si se cae. La crea `instalar-servicio.ps1`, que **ejecuta el usuario como administrador** porque cambia la configuración de Windows: tarea, regla de firewall «YourFlix (TCP 8787)» solo para ese ejecutable (perfiles Privado y Público, porque la Wi-Fi del Ally está como Pública) y energía con cargador sin suspensión ni hibernación.
-- **Parar o arrancar a mano** (sin ser administrador): `C:\YourFlix\servidor\parar.cmd` y `schtasks /run /tn YourFlix`.
+- **Parar, reiniciar y actualizar** (sin ser administrador, desde el Ally): el proceso corre en otra sesión de Windows y `taskkill` da «Acceso denegado», así que se le pide que se cierre por la admin (`POST /admin/api/restart`, solo con sesión de admin o desde localhost).
+  - `reiniciar.cmd`: el servidor se cierra y `iniciar.cmd` lo relanza en 3 s.
+  - `parar.cmd`: termina la tarea y cierra el servidor; para volver: `schtasks /run /tn YourFlix`.
+  - **Actualizar:** compilar a `yourflix.new.exe`, renombrar `yourflix.exe` → `yourflix.old.exe` (Windows lo permite aunque esté en marcha), `yourflix.new.exe` → `yourflix.exe`, copiar `admin/` y lanzar `reiniciar.cmd`. Corta lo que se esté viendo: solo con permiso del usuario.
+  - `reiniciar-forzado.cmd` (doble clic, pide administrador): si el servidor no responde, lo mata y relanza la tarea.
+  - La web de administración también tiene el botón «Reiniciar servidor» en Estado.
 - **Rutas de carátulas:** la importación de la semilla guarda rutas absolutas en `titles.poster` / `titles.backdrop`. `tools/ally/migrar-datos.mjs` copia la base de datos con `VACUUM INTO` y corrige esas rutas. Pendiente: guardarlas relativas a la carpeta de datos.
 - **Probado** (sin cortar el servidor viejo): copia en `127.0.0.1:8788` con 251 títulos, carátulas y fondos 200, vídeo con Range 206, subtítulos cacheados y progreso idéntico; ffprobe encontrado junto al ejecutable.
 

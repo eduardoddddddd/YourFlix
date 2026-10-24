@@ -3,7 +3,7 @@ package main
 // Administración web en /admin/ (fase 5, internal/admin). Para activarla, main.go necesita:
 //
 //	// en serve, justo después de crear hs:
-//	hs.Handler = a.withAdmin(hs.Handler, prof)
+//	hs.Handler = a.withAdmin(hs.Handler, prof, stop)
 //
 //	// en el switch de main:
 //	case "admin":
@@ -33,7 +33,7 @@ var scanMu sync.Mutex
 
 // withAdmin monta /admin/ delante del resto del servidor y copia el registro a la página
 // de estado (sin el token de TMDB).
-func (a *app) withAdmin(rest http.Handler, prof *compat.Profile) http.Handler {
+func (a *app) withAdmin(rest http.Handler, prof *compat.Profile, restart func()) http.Handler {
 	ring := admin.NewRing(500, a.tmdb.Token, a.tmdb.APIKey)
 	log.SetOutput(io.MultiWriter(os.Stderr, ring))
 	if pw := os.Getenv("YOURFLIX_ADMIN_PASSWORD"); pw != "" && !admin.HasPassword(a.db) {
@@ -45,7 +45,7 @@ func (a *app) withAdmin(rest http.Handler, prof *compat.Profile) http.Handler {
 	}
 	web := admin.FindWebDir(os.Getenv("YOURFLIX_ADMIN_WEB"), exeRel("admin"), exeRel("../admin"), "admin")
 	adm, err := admin.New(admin.Config{DB: a.db, TMDB: a.tmdb, Profile: prof, Version: version, DataDir: a.dataDir,
-		FFprobe: a.ffprobe, FFmpeg: a.ffmpeg, WebDir: web, Log: log.Default(), Ring: ring, Lock: &scanMu})
+		FFprobe: a.ffprobe, FFmpeg: a.ffmpeg, WebDir: web, Log: log.Default(), Ring: ring, Lock: &scanMu, Restart: restart})
 	if err != nil {
 		log.Printf("administración desactivada: %v", err)
 		return rest
