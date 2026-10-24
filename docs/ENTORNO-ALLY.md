@@ -64,7 +64,7 @@ Rendimiento observado de la copia: ≈200 MB/s desde el T7 y ≈110 MB/s desde e
 - `serve` no se ha arrancado en el Ally; no hay regla de firewall; no hay servicio de Windows.
 - No se ha tocado la TV: no se instaló nada nuevo ni se lanzó nada.
 - No se ha medido el caudal Wi-Fi Ally → TV (S7/S10).
-- La copia se verificó por número de archivos y bytes, no por hash. La huella del escáner (tamaño + 1 MiB inicial y final) sí coincidió con la semilla en 494 de 496 vídeos, lo que confirma las copias.
+- La copia se verificó solo por número de archivos y bytes totales; **no se comparó el contenido** (ni hash) entre origen y destino. El emparejado «por bytes» con la semilla (494 de 496 vídeos) compara tamaño en bytes y duración, así que **no demuestra** la integridad del contenido. Pendiente si se quiere certeza: `Get-FileHash` (o `robocopy /L` con comparación) sobre origen y copia.
 - Nada está commiteado todavía: los cambios del repo son solo documentación (`README.md`, `PLAN.md`, `docs/`).
 
 ## Por dónde seguir (S10 y después)
