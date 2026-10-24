@@ -43,6 +43,12 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**24-10-2026 — servidor permanente preparado en `C:\YourFlix\servidor` (falta instalar el arranque y hacer el cambio).** Detalle y procedimiento en [docs/ENTORNO-ALLY.md](docs/ENTORNO-ALLY.md#servidor-permanente-en-cyourflixservidor-24-10-2026).
+
+- Hecho: binario de `main`, ffmpeg/ffprobe, token y cachés copiados fuera del worktree; `tools/ally/` con `iniciar.cmd` (relanza si se cae, registro con rotación), `parar.cmd`, `instalar-servicio.ps1` (tarea al encender como SYSTEM, firewall TCP 8787 para ese ejecutable, energía sin suspensión con cargador) y `migrar-datos.mjs` (copia la base de datos y corrige las rutas absolutas de las carátulas).
+- Probado en el Ally, sin cortar el servidor en uso: copia de prueba en `127.0.0.1:8788` idéntica al servidor actual (251 títulos, carátulas, Range 206, subtítulos, progreso).
+- Pendiente: el usuario ejecuta `instalar-servicio.ps1` como administrador; después, con su permiso, corte de unos 20 s para pasar los datos y arrancar la tarea. Hasta entonces sigue el `serve` del worktree.
+
 **24-10-2026 — app 0.3.1 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues).
 
 - **Probado en la TV:** en «Alien contra predator», `#osdAudio` dice «EN 5.1 · AC3» y el registro no tiene ningún `setSelectTrack` al arrancar. En Akira el menú de audio dice «ES 5.1 · AC3», «ES estéreo · AC3» y «JA estéreo · AC3», y el cambio a japonés funcionó 3 de 3 veces (`setSelectTrack AUDIO 3`, `getCurrentStreamInfo` → índice 3, el vídeo sigue avanzando). Apertura en 0,7–1,8 s.
