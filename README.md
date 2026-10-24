@@ -43,11 +43,12 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
-**24-10-2026 — servidor permanente preparado en `C:\YourFlix\servidor` (falta instalar el arranque y hacer el cambio).** Detalle y procedimiento en [docs/ENTORNO-ALLY.md](docs/ENTORNO-ALLY.md#servidor-permanente-en-cyourflixservidor-24-10-2026).
+**24-10-2026 — servidor permanente en marcha en `C:\YourFlix\servidor`.** Detalle y procedimiento en [docs/ENTORNO-ALLY.md](docs/ENTORNO-ALLY.md#servidor-permanente-en-cyourflixservidor-24-10-2026).
 
 - Hecho: binario de `main`, ffmpeg/ffprobe, token y cachés copiados fuera del worktree; `tools/ally/` con `iniciar.cmd` (relanza si se cae, registro con rotación), `parar.cmd`, `instalar-servicio.ps1` (tarea al encender con el usuario de Windows, que la arranca al terminar, firewall TCP 8787 para ese ejecutable, energía sin suspensión con cargador) y `migrar-datos.mjs` (copia la base de datos y corrige las rutas absolutas de las carátulas).
 - Probado en el Ally, sin cortar el servidor en uso: copia de prueba en `127.0.0.1:8788` idéntica al servidor actual (251 títulos, carátulas, Range 206, subtítulos, progreso).
-- Pendiente: el usuario ejecuta `instalar-servicio.ps1` como administrador; después, con su permiso, corte de unos 20 s para pasar los datos y arrancar la tarea. Hasta entonces sigue el `serve` del worktree.
+- **Cambio hecho (20:04):** el usuario ejecutó `instalar.cmd` en el Ally (la tarea «YourFlix» corre con su usuario en modo S4U; el registro de la instalación termina en «LISTO»). Base de datos copiada con `migrar-datos.mjs` justo antes; se paró el `serve` del worktree y el nuevo ocupó el puerto 8787 en 6 s. Comprobado en `192.168.1.13:8787`: ping, 251 títulos, carátulas, vídeo con Range 206, progreso intacto (Alien 30,796 s) y «Seguir viendo» con 6 elementos. El `serverId` no cambia, así que la TV sigue usando la dirección que tenía guardada.
+- Sin comprobar todavía: el arranque tras reiniciar el Ally (la tarea se dispara al encender), y que la TV cargue una película contra el servidor nuevo. `private\` del worktree queda como copia de seguridad.
 
 **24-10-2026 — app 0.3.1 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues).
 
