@@ -1,9 +1,21 @@
 # YourFlix
 
-Servidor de películas y series para casa (Asus ROG Ally con Windows 11, o Mac) y app nativa para la Samsung The Serif (Tizen 6.5). El servidor reúne varias carpetas elegidas por el usuario, identifica cada vídeo con fichas y carátulas y lo sirve por la red local; la tele lo reproduce con Samsung AVPlay.
+Tu propio «Netflix» en casa, sin nube ni suscripciones: un servidor en un PC (hoy un ROG Ally con Windows 11) reúne tus carpetas de películas y series, las identifica con fichas, carátulas y reparto, y las sirve por la red local a:
 
-- [PLAN.md](PLAN.md): arquitectura, fases y decisiones.
+| Dónde | Cómo | Qué hace |
+|---|---|---|
+| **Samsung TV** (Tizen) | app nativa `tv/`, con el mando | Reproduce el archivo tal cual con AVPlay (4K, HEVC 10 bits, varias pistas de audio); subtítulos elegibles, botones de audio y subtítulos en pantalla, siguiente capítulo |
+| **Cualquier navegador** (móvil, Mac, PC) | `http://IP-del-servidor:8787/` | La misma colección. Lo que el navegador no lee lo adapta el servidor al vuelo (audio a AAC, o vídeo recodificado con la GPU) |
+| **Administración** | `http://IP-del-servidor:8787/admin/` | Añadir carpetas con un explorador, escanear, elegir fichas dudosas de TMDB, estado del servidor, reiniciarlo. Sin contraseña desde el propio servidor; desde otro equipo, con la que se define allí la primera vez |
+
+«Seguir viendo» es común: empiezas en la tele y sigues en el móvil en el mismo minuto. Todo es solo red local; internet solo hace falta para las fichas de lo nuevo (TMDB).
+
+**Cómo funciona:** un único ejecutable en Go con SQLite (`server/`) + ffmpeg/ffprobe. La colección inicial sale del catálogo `cine-t7-catalogo` (sin llamar a TMDB); lo nuevo se identifica con TMDB. En el Ally corre como tarea de Windows que arranca al encender y se relanza sola ([docs/ENTORNO-ALLY.md](docs/ENTORNO-ALLY.md)).
+
+- [PLAN.md](PLAN.md): arquitectura, fases y decisiones · [docs/DECISIONES.md](docs/DECISIONES.md): ADR · [docs/API.md](docs/API.md): API.
 - [AGENTS.md](AGENTS.md): reglas para cualquier modelo que trabaje en el repo.
+
+**Instalar en otro Windows:** copiar `C:\YourFlix\servidor` (ejecutable, ffmpeg, `web/`, `admin/`, `data/`, `secrets/`) y ejecutar una vez `instalar.cmd` como administrador (tarea de arranque, firewall TCP 8787, energía). La TV encuentra el servidor sola en la red. La app de la TV va firmada con un certificado de Samsung que caduca el **18-07-2027**: renovarlo antes y reinstalar con el mismo ID.
 
 ## Uso del servidor
 
@@ -34,9 +46,7 @@ node tools/web-demo/e2e.mjs http://localhost:8787 /tmp/capturas   # recorrido co
 node --test web/tests/*.test.js
 ```
 
-Administración web (fase 5, cuando esté montada en `main.go`): `http://localhost:8787/admin/` en el propio servidor entra sin contraseña; desde otro equipo de casa, `http://192.168.1.13:8787/admin/` con la contraseña que se define allí o con `yourflix admin password` (la lee de la entrada estándar). La web vive en `admin/` (o `YOURFLIX_ADMIN_WEB`).
-
-Compilar para el ROG Ally: `cd server && GOOS=windows GOARCH=amd64 go build -o yourflix.exe ./cmd/yourflix`; poner `ffprobe.exe` junto al ejecutable. API: [docs/API.md](docs/API.md).
+Administración web: `http://localhost:8787/admin/` en el propio servidor entra sin contraseña; desde otro equipo de casa, `http://192.168.1.13:8787/admin/` con la contraseña que se define allí o con `yourflix admin password` (la lee de la entrada estándar). La web vive en `admin/` (o `YOURFLIX_ADMIN_WEB`).
 
 TMDB: token de lectura en `secrets/tmdb.token` (fuera de Git; origen: nota «TMDB API» de Joplin), o variables `TMDB_ACCESS_TOKEN` / `TMDB_API_KEY`. Sin token, todo funciona salvo la identificación de lo nuevo.
 
