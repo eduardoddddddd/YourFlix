@@ -81,6 +81,29 @@ Rendimiento observado de la copia: ≈200 MB/s desde el T7 y ≈110 MB/s desde e
 
 El usuario ha avisado de que puede hacer una **refactorización** y añadir más cosas antes de continuar; confirmar con él el alcance antes de tocar `server/` o `tv/`.
 
+## Servidor permanente en `C:\YourFlix\servidor` (24-10-2026)
+
+Sustituye al `serve` lanzado a mano desde el worktree (que se para al cerrar la sesión de Claude o al reiniciar, y cuyos datos viven en una carpeta que se puede borrar al limpiar worktrees).
+
+| Ruta | Contenido |
+|---|---|
+| `C:\YourFlix\servidor\yourflix.exe` | Binario (compilado desde `main`) |
+| `…\ffmpeg.exe`, `…\ffprobe.exe` | Copias de ffmpeg 9.0.2 (gyan): así no depende del PATH |
+| `…\secrets\tmdb.token` | Token de TMDB (fuera de Git) |
+| `…\data\` | `yourflix.db`, `images\`, `subs\` y `yourflix.log` (se rota a `yourflix.old.log` al pasar de 10 MB) |
+| `…\iniciar.cmd`, `parar.cmd`, `instalar.cmd`, `instalar-servicio.ps1` | Copias de `tools/ally/`. `instalar.cmd` (doble clic en el Ally) pide permiso de administrador y lanza el `.ps1`, que deja su resultado en `instalar.log` |
+
+- **Arranque:** tarea programada «YourFlix» al encender, con el usuario de Windows en modo S4U (sin iniciar sesión ni guardar contraseña). Primero se hizo como SYSTEM, pero entonces solo un administrador puede arrancarla o pararla. `iniciar.cmd` relanza el servidor a los 10 s si se cae. La crea `instalar-servicio.ps1`, que **ejecuta el usuario como administrador** porque cambia la configuración de Windows: tarea, regla de firewall «YourFlix (TCP 8787)» solo para ese ejecutable (perfiles Privado y Público, porque la Wi-Fi del Ally está como Pública) y energía con cargador sin suspensión ni hibernación.
+- **Parar o arrancar a mano** (sin ser administrador): `C:\YourFlix\servidor\parar.cmd` y `schtasks /run /tn YourFlix`.
+- **Rutas de carátulas:** la importación de la semilla guarda rutas absolutas en `titles.poster` / `titles.backdrop`. `tools/ally/migrar-datos.mjs` copia la base de datos con `VACUUM INTO` y corrige esas rutas. Pendiente: guardarlas relativas a la carpeta de datos.
+- **Probado** (sin cortar el servidor viejo): copia en `127.0.0.1:8788` con 251 títulos, carátulas y fondos 200, vídeo con Range 206, subtítulos cacheados y progreso idéntico; ffprobe encontrado junto al ejecutable.
+
+**Cambio del viejo al nuevo** (corte de unos 20 s; solo con permiso del usuario y sin nadie viendo nada):
+1. Parar el `serve` del worktree (proceso de la sesión de Claude).
+2. `node tools/ally/migrar-datos.mjs <worktree>\private\data C:\YourFlix\servidor\data`, más `robocopy` de `images` y `subs` para lo extraído desde la prueba.
+3. `schtasks /run /tn YourFlix` y comprobar `http://192.168.1.13:8787/api/v1/ping` y `data\yourflix.log`.
+4. La carpeta `private\` del worktree se queda como copia de seguridad; las reglas «yourflix.exe» del worktree que aceptó el usuario dejan de usarse.
+
 ## Reglas que siguen vigentes
 
 `AGENTS.md`: no instalar ni lanzar nada en la TV sin permiso ni mientras se ve algo; el token de TMDB y los certificados nunca al repo, a la TV, a logs ni a la API; ID de la app `Z8YOURFLX1.YourFlix` (conservarlo); firma con el perfil `CineT7`; distinguir «probado en navegador» de «probado en la TV»; antes de entregar, `go test ./...`, `go vet ./...`, `node --test tv/tests/*.test.js` y `node --check` de cada JS de `tv/`.
