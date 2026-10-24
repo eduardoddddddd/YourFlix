@@ -77,6 +77,10 @@ func (a *Admin) sourceAdd(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "elige una carpeta (ruta absoluta)")
 		return
 	}
+	if networkPath(p) {
+		writeError(w, http.StatusBadRequest, errNetworkPath)
+		return
+	}
 	p = filepath.Clean(p)
 	if st, err := os.Stat(p); err != nil || !st.IsDir() {
 		writeError(w, http.StatusBadRequest, p+" no es una carpeta accesible")
@@ -173,8 +177,15 @@ func (a *Admin) sourceRemove(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "fuente desconocida")
 		return
 	}
-	if a.cfg.Lock != nil {
-		a.cfg.Lock.Lock() // no quitarla a mitad de un escaneo
+	if a.cfg.Lock != nil { // no quitarla a mitad de un escaneo, pero tampoco esperar a que acabe
+		if tl, ok := a.cfg.Lock.(interface{ TryLock() bool }); ok {
+			if !tl.TryLock() {
+				writeError(w, http.StatusConflict, "hay un escaneo en marcha: espera a que termine")
+				return
+			}
+		} else {
+			a.cfg.Lock.Lock()
+		}
 		defer a.cfg.Lock.Unlock()
 	}
 	if err := a.cfg.DB.RemoveSource(s.ID); err != nil {

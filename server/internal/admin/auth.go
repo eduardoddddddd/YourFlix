@@ -184,32 +184,43 @@ type throttle struct {
 
 type attempts struct {
 	fails int
+	last  time.Time
 	until time.Time
 }
 
-const maxFails = 5
+const (
+	maxFails    = 5
+	attemptIdle = 10 * time.Minute // sin intentos en este tiempo, la cuenta vuelve a cero
+)
 
-func (t *throttle) blocked(ip string) time.Duration {
+// attempt cuenta el intento ANTES de comprobar la contraseña, para que N peticiones a la
+// vez no pasen todas el límite, y devuelve cuánto hay que esperar si la IP está bloqueada.
+// Un acierto borra la cuenta (ok).
+func (t *throttle) attempt(ip string) time.Duration {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if a := t.byIP[ip]; a != nil && time.Now().Before(a.until) {
-		return time.Until(a.until)
+	now := time.Now()
+	if len(t.byIP) > 1000 { // no crecer sin límite
+		for k, a := range t.byIP {
+			if now.Sub(a.last) > attemptIdle && now.After(a.until) {
+				delete(t.byIP, k)
+			}
+		}
 	}
-	return 0
-}
-
-func (t *throttle) fail(ip string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	a := t.byIP[ip]
-	if a == nil {
+	if a == nil || (now.Sub(a.last) > attemptIdle && now.After(a.until)) {
 		a = &attempts{}
 		t.byIP[ip] = a
 	}
+	if now.Before(a.until) {
+		return a.until.Sub(now)
+	}
+	a.last = now
 	a.fails++
 	if a.fails >= maxFails {
-		a.fails, a.until = 0, time.Now().Add(time.Minute)
+		a.fails, a.until = 0, now.Add(time.Minute)
 	}
+	return 0
 }
 
 func (t *throttle) ok(ip string) {
@@ -233,6 +244,12 @@ func isLocal(r *http.Request) bool {
 	ip := remoteIP(r)
 	if ip == nil || !ip.IsLoopback() {
 		return false
+	}
+	// Un proxy local (túnel, nginx…) que reescriba el Host a localhost no debe dar entrada sin contraseña.
+	for _, h := range []string{"Forwarded", "X-Forwarded-For", "X-Real-Ip", "Via"} {
+		if r.Header.Get(h) != "" {
+			return false
+		}
 	}
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {

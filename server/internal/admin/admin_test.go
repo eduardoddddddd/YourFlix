@@ -10,9 +10,12 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -669,6 +672,64 @@ func TestStaticAndRing(t *testing.T) {
 	got := strings.Join(r.Last(0), "|")
 	if got != "dos con [oculto] dentro|tres|cuatro" {
 		t.Fatalf("anillo: %q", got)
+	}
+}
+
+// Arreglos de la revisión del PR (Sonnet, 24-10-2026).
+func TestReviewHardening(t *testing.T) {
+	e := setup(t)
+	if err := SetPassword(e.db, "contraseña buena"); err != nil {
+		t.Fatal(err)
+	}
+	// 20 intentos a la vez desde la misma IP: el límite se cuenta antes de comprobar la contraseña.
+	codes := make(chan int, 20)
+	for i := 0; i < 20; i++ {
+		go func() { codes <- e.client("192.168.1.77:1").login("mala") }()
+	}
+	tried := 0
+	for i := 0; i < 20; i++ {
+		if <-codes != http.StatusTooManyRequests {
+			tried++
+		}
+	}
+	if tried > maxFails {
+		t.Fatalf("%d intentos comprobados en paralelo (máximo %d)", tried, maxFails)
+	}
+
+	// Un proxy local con Host: localhost no entra sin contraseña.
+	r := httptest.NewRequest("GET", "/admin/api/sources", nil)
+	r.RemoteAddr, r.Host = local, "localhost:8787"
+	r.Header.Set("X-Forwarded-For", "203.0.113.9")
+	w := httptest.NewRecorder()
+	e.a.ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("detrás de un proxy: %d", w.Code)
+	}
+
+	// JavaScript con su tipo aunque el registro de Windows diga otra cosa.
+	if w := e.client(tv).do("GET", "/admin/admin.js", nil); !strings.HasPrefix(w.Header().Get("Content-Type"), "text/javascript") {
+		t.Fatalf("admin.js: %q", w.Header().Get("Content-Type"))
+	}
+
+	// Quitar una fuente durante un escaneo responde enseguida con 409 en vez de esperar.
+	src, _ := e.db.AddSource("T7", e.dir, "auto", nil)
+	mu := &sync.Mutex{}
+	e.a.cfg.Lock = mu
+	mu.Lock()
+	c := e.client(local)
+	c.session()
+	if w := c.do("DELETE", "/admin/api/sources/"+src.ID, nil); w.Code != http.StatusConflict {
+		t.Fatalf("quitar durante un escaneo: %d", w.Code)
+	}
+	mu.Unlock()
+	if w := c.do("DELETE", "/admin/api/sources/"+src.ID, nil); w.Code != http.StatusOK {
+		t.Fatalf("quitar sin escaneo: %d %s", w.Code, w.Body)
+	}
+
+	if runtime.GOOS == "windows" {
+		if w := c.do("GET", "/admin/api/browse?path="+url.QueryEscape(`\\equipo\carpeta`), nil); w.Code != http.StatusBadRequest {
+			t.Fatalf("carpeta de red: %d", w.Code)
+		}
 	}
 }
 

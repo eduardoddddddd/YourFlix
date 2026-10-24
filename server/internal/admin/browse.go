@@ -78,6 +78,14 @@ type listing struct {
 
 const maxEntries = 3000
 
+const errNetworkPath = "las carpetas de red (\\\\equipo\\carpeta) no se admiten: copia los vídeos a un disco del servidor"
+
+// networkPath: rutas UNC o de dispositivo en Windows. Abrirlas haría que Windows se
+// autentique contra ese equipo y puede colgarse si no responde.
+func networkPath(p string) bool {
+	return runtime.GOOS == "windows" && (strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, `//`))
+}
+
 func readDirTimeout(path string, d time.Duration) (*listing, error) {
 	type res struct {
 		l   *listing
@@ -142,6 +150,10 @@ func (a *Admin) browse(w http.ResponseWriter, r *http.Request) {
 	}
 	if !filepath.IsAbs(p) {
 		writeError(w, http.StatusBadRequest, "la ruta debe ser absoluta")
+		return
+	}
+	if networkPath(p) {
+		writeError(w, http.StatusBadRequest, errNetworkPath)
 		return
 	}
 	p = filepath.Clean(p)

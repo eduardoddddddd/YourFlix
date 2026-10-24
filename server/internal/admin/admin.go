@@ -49,6 +49,7 @@ type Admin struct {
 	mux      *http.ServeMux
 	sessions *sessions
 	throttle *throttle
+	hashMu   sync.Mutex // PBKDF2 de uno en uno: una ráfaga de intentos no ahoga el streaming
 	jobs     *runner
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -230,18 +231,15 @@ func (a *Admin) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := remoteIP(r).String()
-	if d := a.throttle.blocked(ip); d > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int(d.Seconds())+1))
-		writeError(w, http.StatusTooManyRequests, "demasiados intentos: espera un minuto")
-		return
-	}
 	hash, _, _ := a.cfg.DB.Setting(passwordKey)
 	if hash == "" {
 		writeError(w, http.StatusConflict, "aún no hay contraseña: defínela desde el propio servidor (http://localhost:8787/admin/) o con «yourflix admin password»")
 		return
 	}
-	if !checkPassword(hash, in.Password) {
-		a.throttle.fail(ip)
+	if a.tooMany(w, ip) {
+		return
+	}
+	if !a.checkPw(hash, in.Password) {
 		a.cfg.Log.Printf("admin: contraseña incorrecta desde %s", ip)
 		writeError(w, http.StatusUnauthorized, "contraseña incorrecta")
 		return
@@ -251,6 +249,23 @@ func (a *Admin) login(w http.ResponseWriter, r *http.Request) {
 	setCookie(w, s)
 	a.cfg.Log.Printf("admin: sesión iniciada desde %s", ip)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf": s.csrf})
+}
+
+// tooMany cuenta un intento de contraseña y responde 429 si esa IP está bloqueada.
+func (a *Admin) tooMany(w http.ResponseWriter, ip string) bool {
+	d := a.throttle.attempt(ip)
+	if d <= 0 {
+		return false
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(d.Seconds())+1))
+	writeError(w, http.StatusTooManyRequests, "demasiados intentos: espera un minuto")
+	return true
+}
+
+func (a *Admin) checkPw(hash, pw string) bool {
+	a.hashMu.Lock()
+	defer a.hashMu.Unlock()
+	return checkPassword(hash, pw)
 }
 
 func (a *Admin) logout(w http.ResponseWriter, r *http.Request) {
@@ -281,10 +296,14 @@ func (a *Admin) setPassword(w http.ResponseWriter, r *http.Request) {
 	case !local && cur == nil:
 		writeError(w, http.StatusUnauthorized, "inicia sesión de administración")
 		return
-	case hash != "" && !local && !checkPassword(hash, in.Current):
-		a.throttle.fail(remoteIP(r).String())
-		writeError(w, http.StatusUnauthorized, "la contraseña actual no es correcta")
-		return
+	case hash != "" && !local:
+		if a.tooMany(w, remoteIP(r).String()) {
+			return
+		}
+		if !a.checkPw(hash, in.Current) {
+			writeError(w, http.StatusUnauthorized, "la contraseña actual no es correcta")
+			return
+		}
 	}
 	if err := SetPassword(a.cfg.DB, in.Password); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -337,7 +356,17 @@ func (a *Admin) static(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+	// Tipo fijo por extensión: en Windows, Go lo saca del registro y algunos equipos dicen
+	// text/plain para .js, que con nosniff y la CSP dejaría la admin sin JavaScript.
+	if ct, ok := staticTypes[strings.ToLower(filepath.Ext(st.Name()))]; ok {
+		w.Header().Set("Content-Type", ct)
+	}
 	http.ServeContent(w, r, st.Name(), st.ModTime(), f)
+}
+
+var staticTypes = map[string]string{
+	".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+	".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".json": "application/json",
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
