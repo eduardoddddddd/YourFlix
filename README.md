@@ -43,6 +43,12 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**24-10-2026 — app 0.3.1 instalada y probada en la TV** (desde el Mac, mismo ID, firmada con CineT7, monitor CDP activo: 0 latidos perdidos, 0 excepciones, 0 cuelgues).
+
+- **Probado en la TV:** en «Alien contra predator», `#osdAudio` dice «EN 5.1 · AC3» y el registro no tiene ningún `setSelectTrack` al arrancar. En Akira el menú de audio dice «ES 5.1 · AC3», «ES estéreo · AC3» y «JA estéreo · AC3», y el cambio a japonés funcionó 3 de 3 veces (`setSelectTrack AUDIO 3`, `getCurrentStreamInfo` → índice 3, el vídeo sigue avanzando). Apertura en 0,7–1,8 s.
+- **Cierre espontáneo de la 0.3.0:** no se repitió. Akira estuvo 3 minutos reproduciéndose sin tocar nada (de 23 a 195 s), con registros de diagnóstico inyectados por CDP (visibilitychange, keydown, eventos de AVPlay, errores de ventana): ningún evento ni tecla. Lo más probable es que aquella vez fuera una tecla del mando real.
+- Progreso restaurado (Alien 30,796 s, Akira 0) y `subPref` en «EN». No se sabe con certeza qué valor tenía antes de la primera prueba; «EN» encaja con que Alien eligiera solo los subtítulos en inglés.
+
 **24-10-2026 — app 0.3.1: arreglos de la prueba en la TV (sin instalar todavía).**
 
 - Hecho: la etiqueta de audio limpia el `fourCC` real de la TV (`audio/x-ac3` → «AC3»). Ya no se llama a `setSelectTrack` al arrancar cuando AVPlay ha descartado la DTS (es lo que hace la TV real: suena sola la pista compatible); si algún día la listara, el cambio se hace después de `play()`, no en READY. El simulador da el `fourCC` como la TV. El fallo (3) no lo era: Akira solo tiene una pista de subtítulos en español y el servidor la llama «Español».
