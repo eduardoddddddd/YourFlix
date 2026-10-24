@@ -47,7 +47,7 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 **24-10-2026 — administración en marcha en el servidor del Ally (`http://localhost:8787/admin/` desde el Ally; desde otros equipos, con contraseña).**
 
-- Hecho: PR #2 fusionado (`9febe12`) y binario nuevo con `admin/` en `C:YourFlixservidor`. El proceso de la tarea (S4U) no se puede matar desde la sesión del usuario (`taskkill`: «Acceso denegado»): ahora `iniciar.cmd` cierra al arrancar cualquier `yourflix.exe` huérfano (corre en la misma sesión que la tarea) y el servidor se reinicia por la admin (`POST /admin/api/restart`, botón «Reiniciar servidor», `reiniciar.cmd`). Ya no hace falta ir al Ally ni ser administrador para actualizar.
+- Hecho: PR #2 fusionado (`9febe12`) y binario nuevo con `admin/` en `C:\YourFlix\servidor`. El proceso de la tarea (S4U) no se puede matar desde la sesión del usuario (`taskkill`: «Acceso denegado»): ahora `iniciar.cmd` cierra al arrancar cualquier `yourflix.exe` huérfano (corre en la misma sesión que la tarea) y el servidor se reinicia por la admin (`POST /admin/api/restart`, botón «Reiniciar servidor», `reiniciar.cmd`). Ya no hace falta ir al Ally ni ser administrador para actualizar.
 - Probado en el Ally: `schtasks /run` sustituyó el proceso viejo por el nuevo sin intervención; ping, 251 títulos, Range 206, `/admin/` 200 en localhost y 401 desde la LAN sin contraseña, `admin.js` con `text/javascript`; `reiniciar.cmd` → servidor de vuelta en 3 s con otro PID.
 - Pendiente: el usuario define la contraseña de la admin desde el Ally (`http://localhost:8787/admin/`, Estado) para entrar desde el Mac o el móvil. `yourflix.old.exe` se queda como vuelta atrás. La TV no se ha probado contra el binario nuevo (la API pública no cambia).
 
