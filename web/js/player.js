@@ -177,7 +177,7 @@
     hideMsg();
     var f = st.f, v = ui.video;
     var dec = P.decide(f, st.audio, st.caps);
-    st.method = dec.method; st.mode = dec.mode; st.started = false; st.recovered = 0;
+    st.method = dec.method; st.mode = dec.mode; st.started = false; st.recovered = 0; st.frameTime = 0;
     if (dec.method === 'none') { showWait(false); showMsg(dec.why, [{ label: 'Volver', primary: true, action: YF.app.leavePlayer }]); return; }
     showWait(true);
     st.pendingStart = start > 1 ? start : 0;
@@ -189,10 +189,7 @@
       var url = api.url(P.masterURL(f.id, st.variant, st.session, st.pendingStart));
       if (st.caps.hls === 'hlsjs') {
         var Hls = window.Hls;
-        var slow = { maxTimeToFirstByteMs: 120000, maxLoadTimeMs: 180000, timeoutRetry: { maxNumRetry: 1, retryDelayMs: 0, maxRetryDelayMs: 0 },
-          errorRetry: { maxNumRetry: 3, retryDelayMs: 1500, maxRetryDelayMs: 8000, shouldRetry: function (cfg, n, timeout, res) { return n < cfg.maxNumRetry && (!res || !res.code || (res.code >= 500 && res.code !== 501)); } } };
-        var h = st.hls = new Hls({ startPosition: st.pendingStart || -1, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 90,
-          manifestLoadPolicy: { default: slow }, playlistLoadPolicy: { default: slow }, fragLoadPolicy: { default: slow } });
+        var h = st.hls = new Hls(P.hlsConfig(st.pendingStart));
         var my = st.token;
         h.on(Hls.Events.ERROR, function (ev, data) { if (my === token) onHlsError(data); });
         h.on(Hls.Events.MANIFEST_PARSED, function () { if (my === token) tryPlay(); });
@@ -218,8 +215,22 @@
     var Hls = window.Hls, code = data.response && data.response.code;
     if (code === 503) return busy();
     if (code === 409 || code === 501) return showMsg('El servidor no puede convertir este vídeo para el navegador (recodificación desactivada).', [{ label: 'Volver', primary: true, action: YF.app.leavePlayer }]);
-    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && st.recovered < 2) { st.recovered++; st.hls.recoverMediaError(); return; }
+    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && st.recovered < 3) return recover();
     failed('No se pudo reproducir (' + (code ? 'HTTP ' + code : data.details) + ').');
+  }
+
+  // Rehace el MediaSource y sigue reproduciendo donde iba. recoverMediaError solo vuelve a
+  // enganchar el <video>: hls.js arranca entonces en config.startPosition (el punto de inicio
+  // original, no donde se iba) y el vídeo se queda en pausa sin que la interfaz lo sepa.
+  function recover() {
+    var v = ui.video, h = st.hls, t = P.recoverAt(v.currentTime, st.frameTime, st.pendingStart);
+    st.recovered++;
+    st.recoverPos = t;
+    st.frameTime = 0;
+    st.pendingStart = t > 1 ? t : 0;
+    h.config.startPosition = t > 0 ? t : -1;
+    h.recoverMediaError();
+    tryPlay();
   }
 
   function busy() {
@@ -272,8 +283,16 @@
     v.addEventListener('waiting', function () { showWait(true); });
     v.addEventListener('canplay', function () { showWait(false); });
     v.addEventListener('seeked', function () { showWait(false); if (st && st.started) saveProgress(true); });
+    // Tiempo del último fotograma pintado: en el atasco de arranque de Chrome la imagen avanza
+    // aunque currentTime no se mueva, y es donde hay que seguir al recuperar (recover).
+    if (v.requestVideoFrameCallback) {
+      var onFrame = function (now, md) { if (st && !v.seeking) st.frameTime = md.mediaTime; v.requestVideoFrameCallback(onFrame); };
+      v.requestVideoFrameCallback(onFrame);
+    }
+    v.addEventListener('seeking', function () { if (st) st.frameTime = 0; });
     v.addEventListener('timeupdate', function () {
       render();
+      if (st && st.recovered && v.currentTime - st.recoverPos > 30) st.recovered = 0; // otra vez 3 recuperaciones
       if (st && st.started && !v.paused && P.shouldSave(st.lastSave, Date.now(), false)) saveProgress(false);
     });
     v.addEventListener('progress', render);

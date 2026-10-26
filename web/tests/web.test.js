@@ -102,6 +102,22 @@ test('progreso, siguiente capítulo y URL de HLS', () => {
   assert.ok(!P.shouldSave(1000, 10000, false) && P.shouldSave(1000, 16000, false) && P.shouldSave(1000, 1001, true));
 });
 
+test('hls.js sin empujones y recuperación donde va la imagen', () => {
+  const c = P.hlsConfig(0);
+  assert.equal(c.startPosition, -1);
+  assert.equal(P.hlsConfig(2260).startPosition, 2260);
+  assert.equal(c.nudgeMaxRetry, 0, 'los empujones de 0,1 s devuelven la imagen al principio (minibucle de 2 s)');
+  const retry = c.fragLoadPolicy.default.errorRetry;
+  assert.ok(retry.shouldRetry(retry, 0, false, { code: 503 }) && !retry.shouldRetry(retry, 0, false, { code: 501 }) && !retry.shouldRetry(retry, 3, false, { code: 500 }));
+  // Atasco de arranque: currentTime parado en 0,6 mientras la imagen va por 2,4 s.
+  assert.equal(P.recoverAt(0.6, 2.4, 0), 2.4);
+  assert.equal(P.recoverAt(0, 1.7, 0), 1.7);
+  assert.equal(P.recoverAt(0, 0, 2260), 2260, 'antes del primer fotograma: el punto de reanudar');
+  assert.equal(P.recoverAt(2300, 0, 2260), 2300, 'a mitad de película: donde se iba, no el punto de inicio');
+  assert.equal(P.recoverAt(2300, 2290, 0), 2300, 'un fotograma anterior no hace retroceder');
+  assert.equal(P.recoverAt(100, 400, 0), 100, 'un fotograma muy lejano (de antes de un salto) no cuenta');
+});
+
 const jsFiles = fs.readdirSync(path.join(root, 'js')).map((f) => path.join(root, 'js', f));
 
 test('seguridad y reglas del repo', () => {

@@ -103,6 +103,28 @@
 
   P.session = function () { return 'w' + Math.random().toString(36).slice(2, 12); };
 
+  // Opciones de hls.js. Esperas largas: el primer segmento puede tardar (ffmpeg arrancando o
+  // recodificando). nudgeMaxRetry 0: a veces Chrome arranca y pinta el vídeo pero deja el
+  // <video> en readyState 2 con currentTime parado; hls.js lo toma por un atasco y cada 2 s
+  // «empuja» currentTime (0,1 → 0,3 → 0,6 s), lo que devuelve la imagen al principio (el
+  // minibucle de 2 s) y, al tercero, da un error fatal. Sin empujones, el error llega al primer
+  // atasco y el reproductor rehace el MediaSource donde iba la imagen (ver recoverAt).
+  P.hlsConfig = function (start) {
+    var slow = { maxTimeToFirstByteMs: 120000, maxLoadTimeMs: 180000, timeoutRetry: { maxNumRetry: 1, retryDelayMs: 0, maxRetryDelayMs: 0 },
+      errorRetry: { maxNumRetry: 3, retryDelayMs: 1500, maxRetryDelayMs: 8000, shouldRetry: function (cfg, n, timeout, res) { return n < cfg.maxNumRetry && (!res || !res.code || (res.code >= 500 && res.code !== 501)); } } };
+    return { startPosition: start > 0 ? start : -1, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 90, nudgeMaxRetry: 0,
+      manifestLoadPolicy: { default: slow }, playlistLoadPolicy: { default: slow }, fragLoadPolicy: { default: slow } };
+  };
+
+  // Dónde seguir al rehacer el MediaSource tras un error de medio: donde va la imagen (último
+  // fotograma pintado) si va por delante de currentTime, que Chrome puede tener parado; si no,
+  // currentTime; si aún no hay nada, el arranque pendiente (reanudar).
+  P.recoverAt = function (current, frameTime, pending) {
+    var t = current > 0 ? current : (pending > 0 ? pending : 0);
+    if (frameTime > t && frameTime - t < 15) t = frameTime;
+    return t;
+  };
+
   // Subtítulos al empezar. pref: null (nunca eligió), 'off' o idioma («ES»). Los forzados en el
   // idioma del audio se activan aunque esté en 'off' (como en la TV).
   P.pickSubtitle = function (tracks, pref, audioLang) {
