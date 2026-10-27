@@ -27,11 +27,16 @@
   api.put = function (path, body) { return request('PUT', api.base + '/api/v1' + path, body); };
   api.url = function (path) { return path ? api.base + path : ''; };
 
-  api.titles = function (q) {
+  // Los valores en lista se repiten (actor=A&actor=B); los vacíos no se envían.
+  api.qs = function (q) {
     var parts = [];
-    Object.keys(q || {}).forEach(function (k) { if (q[k] !== '' && q[k] != null) parts.push(k + '=' + encodeURIComponent(q[k])); });
-    return api.get('/titles' + (parts.length ? '?' + parts.join('&') : ''));
+    Object.keys(q || {}).forEach(function (k) {
+      [].concat(q[k]).forEach(function (v) { if (v !== '' && v != null) parts.push(k + '=' + encodeURIComponent(v)); });
+    });
+    return parts.length ? '?' + parts.join('&') : '';
   };
+  api.titles = function (q) { return api.get('/titles' + api.qs(q)); };
+  api.facets = function (q) { return api.get('/facets' + api.qs(q)); };
   api.title = function (id) { return api.get('/titles/' + encodeURIComponent(id)); };
   api.progress = function (fileId, position, duration) {
     return api.put('/progress/' + encodeURIComponent(fileId), { position: position, duration: duration }).catch(function () {});

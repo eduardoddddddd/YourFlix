@@ -2,7 +2,7 @@
 (function (YF) {
   'use strict';
   var el = YF.el, $ = YF.$, nav = YF.nav;
-  YF.version = '0.2.0';
+  YF.version = '0.4.0';
 
   var app = YF.app = { stack: [], backAt: 0 };
   var screensEl = $('screens'), menu = $('menu');
@@ -10,12 +10,31 @@
   // ---------- Pantallas ----------
   function current() { return app.stack[app.stack.length - 1]; }
 
+  // Desplazamientos de una pantalla: Chromium los pierde al ocultarla con display:none (tema 1).
+  var SCROLLERS = '.scroller, .track, .links .lrow';
+  function saveScroll(x) {
+    x._scroll = Array.prototype.map.call(x.el.querySelectorAll(SCROLLERS), function (e) { return [e, e.scrollTop, e.scrollLeft]; });
+  }
+  function restoreScroll(x) {
+    (x._scroll || []).forEach(function (v) { if (v[0].isConnected) { v[0].scrollTop = v[1]; v[0].scrollLeft = v[2]; } });
+    x._scroll = null;
+  }
+
+  // activate: muestra s (y, si s es un panel superpuesto, también la de debajo).
   function activate(s, focusEl) {
-    app.stack.forEach(function (x) { x.el.classList.toggle('hidden', x !== s); });
-    nav.setRoots([menu, s.root]);
+    var under = s.overlay ? app.stack[app.stack.length - 2] : null;
+    app.stack.forEach(function (x) {
+      var show = x === s || x === under, was = !x.el.classList.contains('hidden');
+      if (was && !show) saveScroll(x);
+      x.el.classList.toggle('hidden', !show);
+      if (show && !was) restoreScroll(x);
+    });
+    $('app').classList.remove('fullscreen');
+    nav.setRoots(s.overlay ? [s.root] : [menu, s.root]);
     var items = menu.querySelectorAll('.menu-item');
     for (var i = 0; i < items.length; i++) items[i].classList.toggle('active', items[i].dataset.go === app.stack[0].name);
     if (focusEl) nav.focus(focusEl);
+    if (s.onShow) s.onShow();
   }
 
   // open: añade una pantalla encima (Atrás vuelve a la anterior, con su foco).
@@ -38,7 +57,7 @@
 
   // go: sección del menú (vacía la pila).
   app.go = function (name) {
-    if (app.stack.length && app.stack[0].name === name && app.stack.length === 1) return;
+    if (app.stack.length && app.stack[0].name === name && app.stack.length === 1) { if (current().onShow) current().onShow(); return; }
     app.stack.forEach(function (x) { screensEl.removeChild(x.el); });
     app.stack = [];
     var s = name === 'movies' ? YF.screens.grid('movie') : name === 'series' ? YF.screens.grid('series') : YF.screens[name]();
@@ -46,6 +65,7 @@
   };
 
   // Tras ver algo, las pantallas de debajo («Seguir viendo», progreso) se recargan al volver.
+  // Las que tienen onReturn(dirty) deciden ellas qué refrescar (la lista no se recarga entera).
   app.markDirty = function () { app.stack.forEach(function (x) { x.dirty = true; }); };
 
   app.back = function () {
@@ -54,6 +74,7 @@
       screensEl.removeChild(s.el);
       var prev = current();
       activate(prev, prev.last);
+      if (prev.onReturn) { var d = prev.dirty; prev.dirty = false; prev.onReturn(d); return; }
       if (prev.dirty && prev.refresh) {
         prev.dirty = false;
         prev.refresh().then(function (first) {
@@ -70,6 +91,8 @@
   };
 
   // Tras ver algo: refrescar Inicio (Seguir viendo) y la pantalla visible.
+  app.current = current;
+
   app.refreshAll = function () {
     var s = current();
     if (s && s.refresh) { s.dirty = false; s.refresh().then(function (first) { if (!nav.current || !document.body.contains(nav.current)) nav.focus(first); }); }
@@ -135,6 +158,9 @@
       else if (k === 'Left' || k === 'Right' || k === 'Up' || k === 'Down') nav.move(k.toLowerCase());
       return;
     }
+    // Pantallas con teclas propias (kiosco, panel «Filtrar por»): si la usan, no sigue.
+    var cur = current();
+    if (cur && cur.key && cur.key(k)) return;
     switch (k) {
       case 'Left': case 'Right': case 'Up': case 'Down': nav.move(k.toLowerCase()); break;
       case 'Enter': nav.enter(); break;
