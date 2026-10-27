@@ -535,7 +535,7 @@ func Label(name, v string) string {
 
 // Counts: recuentos por categoría dentro de un tipo (movie | series), para la ficha.
 type Counts struct {
-	Director, Actor, Country, Genre, Year, Decade, Runtime map[string]int
+	Director, Actor, Country, Genre, Year, Decade, Runtime, Quality map[string]int
 }
 
 func (x *Index) Counts(kind string) (*Counts, error) {
@@ -543,7 +543,7 @@ func (x *Index) Counts(kind string) (*Counts, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Counts{map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}}
+	c := &Counts{map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}}
 	for _, e := range entries {
 		if kind != "" && e.Kind != kind {
 			continue
@@ -563,6 +563,9 @@ func (x *Index) Counts(kind string) (*Counts, error) {
 		c.Year[e.Year]++
 		c.Decade[e.Decade]++
 		c.Runtime[e.RuntimeBand]++
+		for _, v := range e.Quality {
+			c.Quality[v]++
+		}
 	}
 	return c, nil
 }

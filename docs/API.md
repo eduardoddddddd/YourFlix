@@ -62,7 +62,7 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
 ```
 
 - `links` (añadido el 27-10-2026; `meta` no cambia): los datos de la ficha que llevan a una lista filtrada, con `count` = cuántos títulos **del mismo tipo** (películas o series) lo comparten. El país ya en castellano. `value` es lo que se pasa al filtro cuando no es el propio `name`:
-  `"links":{"director":[{"name":"Ridley Scott","count":6}],"cast":[{"name":"Harrison Ford","count":7},…],"country":[{"name":"Estados Unidos","count":229}],"genres":[{"name":"Drama","count":120}],"year":{"name":"1982","count":4},"decade":{"name":"Años 80","value":"1980","count":61},"runtime":{"name":"De 90 a 120 min","value":"mid","count":140},"quality":[{"name":"1080p","value":"1080","count":0}]}`
+  `"links":{"director":[{"name":"Ridley Scott","count":6}],"cast":[{"name":"Harrison Ford","count":7},…],"country":[{"name":"Estados Unidos","count":229}],"genres":[{"name":"Drama","count":120}],"year":{"name":"1982","count":4},"decade":{"name":"Años 80","value":"1980","count":61},"runtime":{"name":"De 90 a 120 min","value":"mid","count":140},"quality":[{"name":"1080p","value":"1080","count":150}]}`
   Vacío (`{}`) si el título no tiene archivos disponibles.
 - Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`. Si TMDB conoce el capítulo, `episodeInfo` trae `name`, `overview`, `airDate` y `still` (URL de la foto del capítulo):
   `"season":1,"episode":1,"episodeInfo":{"name":"El sistema","overview":"Carmy intenta…","still":"/api/v1/files/9e190eab8098/still?w=300","airDate":"2022-06-23"}`

@@ -259,7 +259,7 @@ func (s *Server) links(t *store.Title) (map[string]any, error) {
 	}
 	q := []link{}
 	for _, v := range e.Quality {
-		q = append(q, link{Name: facets.Label("quality", v), Value: v})
+		q = append(q, link{Name: facets.Label("quality", v), Value: v, Count: c.Quality[v]})
 	}
 	out["quality"] = q
 	return out, nil
