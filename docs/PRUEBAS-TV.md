@@ -135,3 +135,11 @@ TEXT  index 2–4 {"track_num":"0","track_lang":"","subtitle_type":"-1","fourCC"
 
 Notas: el progreso de los archivos se dejó como estaba (Alien 30,796 s; Akira y El Eternauta 1×1 a 0). La preferencia de subtítulos de la app (`subPref`) quedó en «ES» porque se eligió Español en la prueba; antes probablemente era «EN». Una vez el reproductor de Akira se cerró solo mientras no se le enviaba ninguna tecla, sin errores en el registro. Repetido, el mismo recorrido fue bien. Quizá fue una tecla del mando real.
 
+
+## App 0.4.0 en la TV (27-10-2026)
+
+Fichas navegables, «Filtrar por» y Kiosco. Detalle en [CHANGELOG.md](../CHANGELOG.md#040--27-10-2026).
+
+- **Instalación:** desde el Mac, con `tizen build-web`, `tizen package -s CineT7` y `tizen install`. Mismo ID `Z8YOURFLX1.YourFlix`; respuesta «Installed the package». El servidor nuevo (0.4.0) ya estaba en el Ally.
+- **Problema con `sdb`:** `sdb connect 192.168.1.4:26101` fallaba («failed to connect») aunque la TV respondía al ping y el puerto estaba abierto. El Mac usaba una MAC Wi-Fi privada y el router le había dado la `.11`. El modo desarrollador de la TV solo acepta la IP de la PC anfitriona (`192.168.1.3`). Solución: IP manual `192.168.1.3` en la Wi-Fi del Mac. Si vuelve a fallar, mira antes de nada `ipconfig getifaddr en0` en el Mac.
+- **Probado por el usuario con el mando:** fichas con píldoras, «Filtrar por», Kiosco y volver a la lista en la misma posición. Resultado: «funciona todo». No se midieron por separado la fluidez del fundido ni el panel de actores con «Todos».

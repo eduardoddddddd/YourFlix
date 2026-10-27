@@ -13,6 +13,7 @@ Tu propio «Netflix» en casa, sin nube ni suscripciones: un servidor en un PC (
 **Cómo funciona:** un único ejecutable en Go con SQLite (`server/`) + ffmpeg/ffprobe. La colección inicial sale del catálogo `cine-t7-catalogo` (sin llamar a TMDB); lo nuevo se identifica con TMDB. En el Ally corre como tarea de Windows que arranca al encender y se relanza sola ([docs/ENTORNO-ALLY.md](docs/ENTORNO-ALLY.md)).
 
 - [PLAN.md](PLAN.md): arquitectura, fases y decisiones · [docs/DECISIONES.md](docs/DECISIONES.md): ADR · [docs/API.md](docs/API.md): API.
+- [CHANGELOG.md](CHANGELOG.md): versiones · [docs/PENDIENTES.md](docs/PENDIENTES.md): lo que el usuario va pidiendo corregir.
 - [AGENTS.md](AGENTS.md): reglas para cualquier modelo que trabaje en el repo.
 
 **Instalar en otro Windows:** copiar `C:\YourFlix\servidor` (ejecutable, ffmpeg, `web/`, `admin/`, `data/`, `secrets/`) y ejecutar una vez `instalar.cmd` como administrador (tarea de arranque, firewall TCP 8787, energía). La TV encuentra el servidor sola en la red. La app de la TV va firmada con un certificado de Samsung que caduca el **18-07-2027**: renovarlo antes y reinstalar con el mismo ID.
@@ -68,7 +69,16 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
-**27-10-2026 — fichas navegables, «Filtrar por» y Kiosco (rama `feat/categorias-kiosco`, sin desplegar).** Plan: [docs/PLAN-NAVEGACION-KIOSCO.md](docs/PLAN-NAVEGACION-KIOSCO.md) (los pasos de despliegue están en su sección «Despliegue»). Hecho en una sesión en la nube, sin acceso a la LAN, al Ally ni a la TV.
+**27-10-2026 — versión 0.4.0: fichas navegables, «Filtrar por» y Kiosco. Fusionada en `main`, desplegada en el Ally y en la TV, y probada por el usuario en la TV y en la web.** Novedades en [CHANGELOG.md](CHANGELOG.md).
+
+- **Despliegue (27-10, 23:17):** binario y `web/` nuevos en `C:\YourFlix\servidor`, con la TV sin uso. La vuelta atrás queda en `yourflix.old.exe` y `web-backup-20261027`. App 0.4.0 instalada desde el Mac (`tizen install`, perfil CineT7, mismo ID). El usuario lo probó con el mando y en el navegador: «funciona todo, tv y web».
+- **Comprobado antes de desplegar**, contra una copia de la base de datos real (290 títulos) en `127.0.0.1:8788`:
+  - filtros y recuentos (Ridley Scott 6, Harrison Ford 7, España + años 80: 9), países en castellano, y el aleatorio repite el orden con la misma semilla;
+  - en Edge con Playwright, volver de una ficha a la tarjeta 218 de 269 conserva la posición, en la web y en la app de la TV dentro del navegador;
+  - en el Kiosco, ◀▶ vuelve al mismo título; 0 errores de JavaScript.
+- **Mac y TV:** `sdb` no conectaba porque el Mac usaba una MAC Wi-Fi privada y el router le daba la `.11`. La TV solo acepta `sdb` desde `192.168.1.3`, así que el Mac tiene ahora esa IP fija en Wi-Fi.
+
+**Trabajo en la nube (antes del despliegue):** Plan: [docs/PLAN-NAVEGACION-KIOSCO.md](docs/PLAN-NAVEGACION-KIOSCO.md) (los pasos de despliegue están en su sección «Despliegue»). Hecho en una sesión en la nube, sin acceso a la LAN, al Ally ni a la TV.
 
 - **Hecho:**
   - **Servidor** (`feat/categorias-servidor`): índice de categorías en memoria `internal/facets`, que se rehace al cambiar la huella de `titles`/`files`. Nuevo `GET /api/v1/facets`. En `/titles`, filtros nuevos (`director`, `actor`, `person`, `country`, `year`, `decade`, `runtime`, `rating`, `quality`, `audio`, `subs`, `state`) y los órdenes `sort=runtime` y `sort=random&seed=N`. En la ficha, `links` con recuentos y el país en castellano. La API solo añade campos y parámetros ([docs/API.md](docs/API.md)).

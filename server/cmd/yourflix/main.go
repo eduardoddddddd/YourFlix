@@ -38,7 +38,7 @@ import (
 	"github.com/eduardoddddddd/YourFlix/server/internal/tmdb"
 )
 
-const version = "0.1.0"
+const version = "0.4.0"
 
 type app struct {
 	dataDir, ffprobe, profile string
