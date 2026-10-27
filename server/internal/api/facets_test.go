@@ -60,7 +60,7 @@ func setupCatalog(t *testing.T) (http.Handler, *store.DB) {
 	db.UpsertTitle(&store.Title{ID: "gone", Kind: "movie", Title: "Prometheus", Year: "2012", Meta: json.RawMessage(`{"director":["Ridley Scott"]}`), MatchSource: "seed", Norm: "prometheus"}, false)
 	db.SaveFile(&store.File{ID: "fgone", SourceID: src.ID, RelPath: "gone.mkv", Size: 7, Fingerprint: "gone", TitleID: "gone", MissingSince: store.Now()})
 	db.SaveProgress(store.Progress{FileID: "fm1", Position: 7000, Duration: 7020, Watched: true}) // Alien vista
-	db.SaveProgress(store.Progress{FileID: "fm2", Position: 600, Duration: 7020})                // Blade Runner a medias
+	db.SaveProgress(store.Progress{FileID: "fm2", Position: 600, Duration: 7020})                 // Blade Runner a medias
 	db.SaveProgress(store.Progress{FileID: "fs1", Position: 1700, Duration: 1750, Watched: true}) // The Bear: 1 de 2
 	prof, _ := compat.Load("")
 	s := &Server{DB: db, Images: images.New(filepath.Join(dir, "img")), Profile: prof, Version: "test", Log: log.New(io.Discard, "", 0)}
