@@ -20,6 +20,7 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .menu-item.active{color:var(--text)}
 .menu-item.focused{background:var(--gold);color:#201704;border-color:var(--gold)}
 #clock{margin-left:auto;color:var(--muted);font-size:26px}
+#app.fullscreen #menu{display:none}
 
 /* Pantallas */
 #screens{position:absolute;left:0;top:0;width:1920px;height:1080px}
@@ -72,6 +73,28 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .grid-head h1{font:400 56px Georgia,serif;margin:0 0 18px}
 .grid{padding:10px 90px 80px}
 .grid .card{margin:0 26px 34px 0}
+.chips{white-space:nowrap}
+.chips-label{display:inline-block;margin:0 18px 10px 0;color:var(--muted);font-size:22px;letter-spacing:.08em;text-transform:uppercase;vertical-align:middle}
+.chip.active{color:var(--text);border-color:var(--gold);background:rgba(229,185,92,.16)}
+.chip.active.focused,.chip.kiosk.focused{background:var(--gold);color:#201704}
+.chip.kiosk{color:var(--gold)}
+
+/* Panel «Filtrar por» (encima de la lista) */
+.picker-screen{z-index:6;pointer-events:none}
+.picker{position:absolute;right:0;top:0;width:680px;height:1080px;padding:70px 46px 40px;background:rgba(9,11,16,.97);border-left:2px solid var(--gold);box-shadow:-30px 0 60px rgba(0,0,0,.6)}
+.picker h2{font:400 40px Georgia,serif;margin:0 0 24px}
+.plist{height:832px;overflow:hidden}
+.pitem,.phead{height:64px;line-height:60px;padding:0 20px;border-radius:12px;font-size:26px;white-space:nowrap;overflow:hidden;border:2px solid transparent}
+.phead{color:var(--gold);font-size:20px;letter-spacing:.14em;text-transform:uppercase;line-height:76px}
+.pitem .pname{display:inline-block;width:480px;overflow:hidden;text-overflow:ellipsis;vertical-align:top}
+.pitem .pcount{float:right;color:var(--muted)}
+.pitem.on{color:var(--gold)}
+.pitem.on .pname:before{content:"✓ "}
+.pitem.toggle{color:var(--muted);font-size:23px}
+.pitem.sel{background:var(--gold);color:#201704}
+.pitem.sel .pcount{color:#201704}
+.phint{position:absolute;left:46px;bottom:18px;color:var(--muted);font-size:20px;margin:0}
+.pletter{position:absolute;right:720px;top:470px;width:140px;height:140px;line-height:140px;text-align:center;border-radius:20px;background:rgba(9,11,16,.92);border:2px solid var(--gold);color:var(--gold);font:400 84px Georgia,serif}
 
 /* Ficha */
 .detail-bg{position:absolute;left:0;top:0;width:1920px;height:1080px;object-fit:cover;opacity:.55}
@@ -82,6 +105,14 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .detail .synopsis{max-height:152px}
 .people{margin:16px 0;font-size:23px;color:var(--muted)}
 .people b{color:var(--text);font-weight:400}
+.links{margin-top:22px;width:1100px}
+.lrow{white-space:nowrap;overflow:hidden;padding:4px 0 0 4px}
+.llabel{display:inline-block;width:150px;color:var(--muted);font-size:20px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle;margin-bottom:10px}
+.chip.pill{font-size:22px;padding:8px 18px;margin:0 8px 8px 0;color:#d6d2c8}
+.chip.pill.focused{color:#201704}
+.detail.series .links{margin-top:12px}
+.detail.series .seasons{display:inline-block;margin:0 0 0 12px;vertical-align:middle}
+.detail.series .seasons .chip{margin-bottom:0}
 .badges{margin:14px 0 26px}
 .badge{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border:2px solid var(--line);border-radius:8px;font-size:20px;color:#c9cfda}
 .badge.gold{border-color:rgba(229,185,92,.6);color:var(--gold)}
@@ -106,6 +137,28 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .episode.focused{transform:scale(1.05)}
 .episode.focused .art{border-color:var(--gold)}
 .watched{position:absolute;right:10px;top:10px;background:var(--gold);color:#201704;border-radius:50%;width:34px;height:34px;text-align:center;line-height:34px;font-weight:700}
+
+/* Kiosco: dos capas que se funden (opacity + transition, Chromium 85) */
+.kiosk{background:#000}
+.kslide{position:absolute;left:0;top:0;width:1920px;height:1080px;opacity:0;transition:opacity .6s ease}
+.kslide.shown{opacity:1}
+.kbg{position:absolute;left:0;top:0;width:1920px;height:1080px;object-fit:cover}
+.kshade{position:absolute;left:0;top:0;width:1920px;height:1080px;background:linear-gradient(90deg,rgba(9,11,16,.95) 0,rgba(9,11,16,.82) 36%,rgba(9,11,16,.25) 68%,rgba(9,11,16,.1) 100%),linear-gradient(0deg,rgba(9,11,16,.9) 0,rgba(9,11,16,0) 40%)}
+.kposter{position:absolute;right:130px;top:150px;width:420px;height:630px;border-radius:16px;object-fit:cover;box-shadow:0 30px 70px rgba(0,0,0,.7)}
+.kinfo{position:absolute;left:100px;top:110px;width:1120px}
+.kinfo h1{font:400 78px/1.02 Georgia,serif;margin:10px 0 16px;max-height:160px;overflow:hidden}
+.kgenres{color:var(--gold);font-size:24px;margin:-6px 0 14px}
+.kinfo .people{margin:8px 0 14px}
+.kinfo .synopsis{max-height:182px}
+.kinfo .badges{margin:16px 0 10px}
+.kprogress{position:relative;width:520px;height:10px;border-radius:5px;background:rgba(255,255,255,.2);overflow:hidden}
+.kprogress span{position:absolute;left:0;top:0;height:10px;background:var(--gold)}
+.kleft{color:var(--muted);font-size:22px;margin-top:8px}
+.kbtns{position:absolute;left:100px;top:900px}
+.kbar{position:absolute;left:0;top:860px;width:1920px;height:220px;padding:40px 100px;background:rgba(9,11,16,.94);border-top:2px solid var(--gold);white-space:nowrap}
+.khint{position:absolute;right:100px;bottom:34px;color:var(--muted);font-size:21px;text-shadow:0 1px 4px #000}
+.kcount{position:absolute;right:100px;top:60px;color:var(--muted);font-size:22px;text-shadow:0 1px 4px #000}
+.kiosk .empty{top:480px}
 
 /* Buscar */
 .search{position:absolute;left:90px;top:140px;width:1740px}

@@ -9,10 +9,23 @@
   function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 
   // pick: puro, testeable. from y cands son rectángulos {left, top, width, height, right, bottom}.
+  // En vertical solo cuenta la fila más próxima (la primera banda que se cruza): así, entre filas de
+  // anchos distintos (botones, una píldora de Dirección, diez de Reparto) no se salta una fila corta.
   nav.pick = function (from, cands, dir) {
-    var fc = center(from), best = -1, bestScore = Infinity;
-    for (var i = 0; i < cands.length; i++) {
-      var c = cands[i], cc = center(c), primary, secondary;
+    var fc = center(from), best = -1, bestScore = Infinity, band = null, i, c;
+    if (dir === 'down' || dir === 'up') {
+      for (i = 0; i < cands.length; i++) {
+        c = cands[i];
+        var cy = center(c).y;
+        if (dir === 'down' && !(cy <= fc.y + 1 || c.top < from.top + 1) && (!band || c.top < band.top)) band = c;
+        if (dir === 'up' && !(cy >= fc.y - 1 || c.bottom > from.bottom - 1) && (!band || c.bottom > band.bottom)) band = c;
+      }
+    }
+    for (i = 0; i < cands.length; i++) {
+      c = cands[i];
+      var cc = center(c), primary, secondary;
+      if (band && dir === 'down' && c.top >= band.bottom) continue;
+      if (band && dir === 'up' && c.bottom <= band.top) continue;
       switch (dir) {
         case 'right': if (cc.x <= fc.x + 1 || c.left < from.left + 1) continue; primary = Math.max(0, c.left - from.right); secondary = Math.abs(cc.y - fc.y) * 3; break;
         case 'left': if (cc.x >= fc.x - 1 || c.right > from.right - 1) continue; primary = Math.max(0, from.left - c.right); secondary = Math.abs(cc.y - fc.y) * 3; break;
@@ -48,6 +61,9 @@
     if (!noScroll) scrollIntoView(e);
     if (e._onFocus) e._onFocus(e);
   };
+
+  // blur: sin foco (el kiosco maneja sus teclas y no muestra ningún elemento enfocado).
+  nav.blur = function () { if (nav.current) nav.current.classList.remove('focused'); nav.current = null; };
 
   // Desplaza el contenedor horizontal (fila) y el vertical (pantalla) lo justo para verlo.
   function scrollIntoView(e) {
