@@ -68,6 +68,32 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**27-10-2026 — fichas navegables, «Filtrar por» y Kiosco (rama `feat/categorias-kiosco`, sin desplegar).** Plan: [docs/PLAN-NAVEGACION-KIOSCO.md](docs/PLAN-NAVEGACION-KIOSCO.md) (los pasos de despliegue están en su sección «Despliegue»). Hecho en una sesión en la nube, sin acceso a la LAN, al Ally ni a la TV.
+
+- **Hecho:**
+  - **Servidor** (`feat/categorias-servidor`): índice de categorías en memoria `internal/facets`, que se rehace al cambiar la huella de `titles`/`files`. Nuevo `GET /api/v1/facets`. En `/titles`, filtros nuevos (`director`, `actor`, `person`, `country`, `year`, `decade`, `runtime`, `rating`, `quality`, `audio`, `subs`, `state`) y los órdenes `sort=runtime` y `sort=random&seed=N`. En la ficha, `links` con recuentos y el país en castellano. La API solo añade campos y parámetros ([docs/API.md](docs/API.md)).
+  - **Web** (`feat/categorias-web`): ficha con enlaces, «Filtrar por» con desplegables con búsqueda y filtros en la dirección, pestaña Kiosco (`#/kiosco?semilla=N&i=K`) y vuelta a la misma tarjeta (tema 1).
+  - **TV, app 0.4.0** (`feat/categorias-tv`): píldoras en la ficha, panel lateral `S.picker` con salto por letra, Kiosco en el menú entre Series y Buscar, y la lista que ya no se recarga entera al volver de la ficha o del reproductor (tema 1). `nav.pick` cambia: al subir o bajar elige la fila más próxima. El reproductor no se ha tocado.
+  - **Demo:** `tools/web-demo/make_categorias.sh` monta la biblioteca de demostración: 46 películas y 2 series de la semilla con vídeos pequeños en 4K HDR, 1080p, 720p y SD.
+- **Probado en el navegador** (Chromium con Playwright, contra el servidor de la rama integrada y esa biblioteca):
+  - `go test ./...` y `go vet ./...`, con tests nuevos de filtros, recuentos, países, orden aleatorio estable entre páginas y ficha con recuentos.
+  - Tests de la TV (21) y de la web (12), y `node --check` de todos los JS.
+  - Web a 1920 px y a 390 px (`tools/web-demo/e2e-categorias.mjs`): 44 comprobaciones, entre ellas ficha → Ridley Scott (5) → «Años 80» → Atrás con el desplazamiento conservado, y kiosco ◀▶, Reproducir y Ver ficha volviendo al mismo título. 0 errores de JavaScript.
+  - App de la TV a 1920×1080 con `avplay-sim.js` (`tools/tv-demo/e2e-categorias.mjs`):
+    - ficha → Peter Jackson → «Años 2010» → Atrás;
+    - lista → ficha → Atrás, y lista → ficha → Reproducir → Atrás → Atrás: en los dos casos, misma tarjeta y mismo desplazamiento;
+    - Kiosco ◀▶, Reproducir y Ver ficha;
+    - 0 errores y 0 cuelgues del simulador.
+  - Capturas en `docs/capturas/categorias-kiosco/`.
+- **Sin probar en la TV real:**
+  - fluidez del fundido del kiosco y memoria con fondos de 1920 px;
+  - restauración del desplazamiento tras ocultar pantallas en Chromium 85;
+  - el `nav.pick` nuevo en toda la app;
+  - panel de actores con «Todos» (2.278 nombres);
+  - teclas del kiosco y del panel con el mando.
+- **Sin probar en ningún sitio:** el catálogo real de 290, en particular la vuelta a una lista de más de 60 títulos, que la demo no alcanza. En la TV: el pase automático y los filtros «Sin ver», género y década del kiosco.
+- **Siguiente paso:** el despliegue P4, con el usuario. Primero el servidor y `web/` en el Ally; después la app 0.4.0 desde el Mac, con permiso y sin nada reproduciéndose. Anotar los resultados en `docs/PRUEBAS-TV.md`.
+
 **27-10-2026 — «Recién añadidas» por llegada del archivo (rama `fix/orden-anadidas`, sin desplegar).** «No hay salida (1987)» se escaneó bien pero se enlazó a la ficha que la semilla había creado el 24-10 sin archivo, y `sort=added` ordenaba por la creación de la ficha (`titles.added_at`): quedaba enterrada y parecía que no se había añadido. Ahora `sort=added` y el `addedAt` de `GET /titles` usan la llegada del archivo disponible más reciente del título (`MAX(files.added_at)` sin ausentes); una serie con un capítulo nuevo también sube. La ficha (`GET /titles/{id}`) conserva la fecha de creación. Revisado: ningún otro sitio usa `titles.added_at` como novedad (admin, «Seguir viendo» y géneros no), y los clientes no muestran `addedAt`, así que web y TV no cambian. Probado: test nuevo `store/TestListTitlesAddedUsesLatestFile` (falla sin el arreglo), `go test ./...`, `go vet ./...`, tests de TV (13) y web (8), `node --check` de `tv/js` y `web/js`; contra una copia de la base real en `127.0.0.1:8788`: «No Hay Salida» sale la primera (285 títulos, 85 ms con `limit=500`). Sin probar en la TV ni en el servidor en uso. Pendiente: desplegar cuando el usuario quiera.
 
 **26-10-2026 — web: arreglo del «minibucle de 2 s» al arrancar (rama `fix/bucle-arranque`, sin desplegar).** Visto en Chrome headless en el Ally (2 de ~45 aperturas, intermitente): Chrome pinta el vídeo pero deja el `<video>` en readyState 2 con `currentTime` parado; hls.js lo toma por atasco y cada 2 s empuja `currentTime` (0,1 → 0,3 → 0,6 s), lo que devuelve la imagen al principio; al tercero, error fatal, y `recoverMediaError()` dejaba el vídeo en pausa en el punto de inicio (en una reanudación, en el punto de reanudar aunque se fuera más adelante) sin que la interfaz lo supiera. Ahora: `nudgeMaxRetry: 0` (sin empujones), y la recuperación rehace el MediaSource en la posición de la imagen (`requestVideoFrameCallback`) o de `currentTime` y vuelve a reproducir (hasta 3 veces; el contador se reinicia tras 30 s). Probado en Chrome y Edge headless contra una copia de los datos en `127.0.0.1:8788`: aperturas normales sin cambios; atasco forzado con el código real de hls.js → sigue en 5,1 s / 2266 s reproduciendo (antes: pausa en 0 / 2260). Sin probar: la causa interna del atasco en Chrome, móviles Android, y que el usuario no vuelva a verlo.

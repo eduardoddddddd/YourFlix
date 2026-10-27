@@ -4,7 +4,7 @@ Lista de cosas que el usuario va pidiendo corregir. Cada tema: qué pasa, análi
 
 ## 1. Al volver de una ficha, la lista vuelve arriba (TV y web)
 
-**Apuntado el 27-10-2026 · estado: pendiente**
+**Apuntado el 27-10-2026 · estado: hecho en `feat/categorias-kiosco` (web y TV), probado en el navegador; falta comprobarlo en la TV y con el catálogo real de 290**
 
 **Qué pasa:** en Películas (o Series), bajas hasta, por ejemplo, la W, entras en una ficha y al volver atrás la lista aparece arriba del todo, en «1917». Debería quedarse en la película de la que saliste.
 

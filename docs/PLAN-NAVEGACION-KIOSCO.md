@@ -1,6 +1,6 @@
 # Plan: fichas navegables y Kiosco
 
-**27-10-2026 · plan, nada implementado.** Saca de [PLAN-INTERFAZ.md](PLAN-INTERFAZ.md) las partes §1, §2 y §6 (fichas que enlazan, explorar con filtros, TV) y añade una pestaña nueva, **Kiosco**. Es para la TV y para la web a la vez. Incluye el tema 1 de [PENDIENTES.md](PENDIENTES.md) (volver a la lista sin perder la posición), porque con la navegación nueva se va atrás mucho más.
+**27-10-2026 · implementado en `feat/categorias-kiosco` (P0–P3), probado en el navegador; falta P4 (despliegue y TV).** Saca de [PLAN-INTERFAZ.md](PLAN-INTERFAZ.md) las partes §1, §2 y §6 (fichas que enlazan, explorar con filtros, TV) y añade una pestaña nueva, **Kiosco**. Es para la TV y para la web a la vez. Incluye el tema 1 de [PENDIENTES.md](PENDIENTES.md) (volver a la lista sin perder la posición), porque con la navegación nueva se va atrás mucho más.
 
 ## Qué hay en las fichas hoy (catálogo real, 290 títulos: 269 películas y 21 series)
 
@@ -114,3 +114,36 @@ Por separado: **solo el Kiosco** (servidor aleatorio + web + TV) son unos 350.00
 3. **OK en el kiosco:** muestra Reproducir (seleccionado) y Ver ficha. Así no arranca un vídeo por accidente. *Recomendado.*
 4. **Pase automático:** opcional y apagado por defecto. *Recomendado.*
 5. **Fotos de actores, sagas e idioma original:** fuera de este plan (necesitan TMDB para el T7 y un ADR).
+
+## Despliegue (P4, con el usuario)
+
+Estado al empezar: rama `feat/categorias-kiosco` probada en el navegador (ver «Estado» en `README.md`). La API solo añade campos y parámetros: se puede poner primero el servidor y después la app de la TV; la 0.3.1 instalada sigue funcionando con el servidor nuevo.
+
+**(a) Servidor y web en el Ally** (PowerShell, con la TV sin uso: reiniciar corta lo que se esté viendo)
+
+```powershell
+cd <repo YourFlix>; git fetch origin; git checkout feat/categorias-kiosco; git pull
+cd server; go test ./...; go build -o C:\YourFlix\servidor\yourflix.new.exe ./cmd/yourflix; cd ..
+cd C:\YourFlix\servidor
+Rename-Item yourflix.exe yourflix.old.exe -Force   # vuelta atrás (borra antes el .old anterior si existe)
+Rename-Item yourflix.new.exe yourflix.exe
+robocopy <repo YourFlix>\web C:\YourFlix\servidor\web /MIR /XD tests /NP /NDL /NJH
+.\reiniciar.cmd
+```
+
+Comprobar: `curl http://192.168.1.13:8787/api/v1/ping`; `…/api/v1/facets?kind=movie&only=director` devuelve directores con su número; en un navegador, `http://192.168.1.13:8787/#/kiosco` y una ficha con enlaces. Si algo va mal: renombrar `yourflix.old.exe` → `yourflix.exe` y `reiniciar.cmd`.
+
+**(b) App de la TV desde el Mac** (`192.168.1.3`, Tizen Studio, perfil de firma `CineT7`; con permiso del usuario y sin nada reproduciéndose)
+
+```bash
+cd <repo YourFlix>; git fetch origin; git checkout feat/categorias-kiosco; git pull
+node --test tv/tests/*.test.js
+TIZEN="$HOME/tizen-studio/tools/ide/bin/tizen"; SDB="$HOME/tizen-studio/tools/sdb"
+"$SDB" connect 192.168.1.4:26101 && "$SDB" devices          # debe salir QE43LS01BBUXXC
+cd tv && rm -rf .buildResult
+"$TIZEN" build-web -e "tests/*" -- . && "$TIZEN" package -t wgt -s CineT7 -- .buildResult
+ls .buildResult/*.wgt                                        # YourFlix.wgt: sin espacios en el nombre
+"$TIZEN" install -n YourFlix.wgt -t QE43LS01BBUXXC -- .buildResult
+```
+
+`tv/config.xml` conserva el ID `Z8YOURFLX1.YourFlix` (versión 0.4.0), así que se instala encima de la 0.3.1 sin perder el servidor guardado. Probar con el mando: ficha → píldora del director → «Filtrar por» → sumar década → Atrás (misma tarjeta); ficha → Reproducir → Atrás → Atrás (misma tarjeta); Kiosco ◀▶, Reproducir, Ver ficha; panel de actores con «Todos» (2.278 nombres) y fluidez del fundido a 1920 px. Anotar los resultados en `docs/PRUEBAS-TV.md`.
