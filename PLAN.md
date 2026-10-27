@@ -367,7 +367,7 @@ Transcodificación en vivo (HLS) · varios perfiles de usuario · capítulos MKV
 
 1. **Contrato primero**: `docs/API.md` + fixtures y `profiles/*.json` se congelan antes de paralelizar. Cambiar el contrato = ADR + aviso en README.
 2. **Un escritor por zona**: `server/` y `tv/` pueden ir a la vez con modelos distintos; dos modelos nunca editan los mismos archivos a la vez.
-3. **Rama por paquete** (`fase-1a/stream`, `fase-2/ficha`…), PR, y **revisión por un modelo distinto** del que implementó.
+3. **Rama por paquete** (`fase-1a/stream`, `fase-2/ficha`…) y PR.
 4. **Cada sesión termina** actualizando la sección «Estado» de `README.md`: qué se hizo, qué se probó de verdad (navegador ≠ TV), qué falta, siguiente paso. Es el relevo del siguiente modelo.
 5. **Decisiones** en `docs/DECISIONES.md` (ADR numerados, breves). No se re-discute una decisión cerrada sin un dato nuevo.
 6. **La TV es del usuario**: instalar o lanzar en la tele solo desde una sesión con acceso al Mac y con permiso, nunca mientras está viendo algo.

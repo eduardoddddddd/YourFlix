@@ -9,7 +9,7 @@ Lee `PLAN.md` completo y la sección «Estado» de `README.md` antes de tocar na
 - Servidor: la biblioteca es **solo lectura**. La API nunca recibe rutas, solo IDs (salvo el explorador de carpetas de la admin, solo para localhost/admin).
 - Metadatos: la colección T7 sale de la semilla `cine-t7-catalogo`, sin llamar a TMDB; TMDB solo para lo nuevo. El token está en `secrets/tmdb.token` (origen: nota «TMDB API» de Joplin). Nunca lo copies al repo, a la TV, a logs ni a respuestas de la API.
 - No instales ni lances nada en la TV sin permiso del usuario, y nunca mientras está viendo algo.
-- Un escritor por zona (`server/`, `tv/`); rama por paquete; revisión por un modelo distinto.
+- Un escritor por zona (`server/`, `tv/`); rama por paquete.
 - Antes de entregar: `go test ./...`, `go vet ./...`, `node --test tv/tests/*.test.js`, `node --check` de cada JS de `tv/`.
 - Distingue siempre «probado en navegador» de «probado en la TV». No prometas transcodificación en vivo, DRM ni acceso remoto.
 - Al terminar, actualiza «Estado» en `README.md`: hecho, probado de verdad, pendiente, siguiente paso.
