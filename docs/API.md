@@ -25,6 +25,8 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
   "files":2,"sources":["Pruebas","aMule"],"addedAt":"2026-10-23T18:56:26Z","matched":true}]}
 ```
 
+`addedAt` (y el orden `sort=added`) = llegada del archivo disponible **más reciente** del título, no la creación de la ficha: una ficha de la semilla que espera su archivo, o una serie con un capítulo nuevo, sube a «Recién añadidas» cuando llega el archivo. En `GET /titles/{id}`, `title.addedAt` sigue siendo la creación de la ficha.
+
 `matched: false` = ficha provisional deducida del nombre del archivo: TMDB no la identificó con seguridad (pendiente de elegir a mano).
 
 ## `GET /titles/{id}`

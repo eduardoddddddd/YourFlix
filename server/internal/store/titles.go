@@ -172,9 +172,15 @@ type TitleSummary struct {
 	Backdrop string   `json:"backdrop,omitempty"`
 	Files    int      `json:"files"`
 	Sources  []string `json:"sources"`
-	AddedAt  string   `json:"addedAt"`
+	AddedAt  string   `json:"addedAt"` // llegada del archivo disponible más reciente (ver lastFileAt)
 	Matched  bool     `json:"matched"`
 }
+
+// lastFileAt: fecha en que llegó el archivo disponible más reciente del título. Es la
+// «novedad» que ve el usuario: una ficha de la semilla creada días antes sin archivo, o una
+// serie a la que se le añade un capítulo, suben a «Recién añadidas» cuando llega el archivo.
+// titles.added_at solo dice cuándo se creó la ficha.
+const lastFileAt = `(SELECT MAX(f.added_at) FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL)`
 
 type TitleQuery struct {
 	Kind, Q, Sort, Genre string
@@ -209,14 +215,14 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 	case "year":
 		order = `t.year DESC, t.norm`
 	case "added":
-		order = `t.added_at DESC, t.norm`
+		order = lastFileAt + ` DESC, t.norm`
 	case "rating":
 		order = `COALESCE(json_extract(t.meta,'$.rating'),0) DESC, t.norm`
 	}
 	if tq.Limit <= 0 || tq.Limit > 500 {
 		tq.Limit = 60
 	}
-	q := `SELECT t.id,t.kind,t.title,t.year,t.meta,t.poster,t.backdrop,t.added_at,t.match_source,
+	q := `SELECT t.id,t.kind,t.title,t.year,t.meta,t.poster,t.backdrop,COALESCE(` + lastFileAt + `,t.added_at),t.match_source,
 		(SELECT COUNT(*) FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL),
 		(SELECT group_concat(DISTINCT s.label) FROM files f JOIN sources s ON s.id=f.source_id WHERE f.title_id=t.id AND f.missing_since IS NULL)
 		FROM titles t WHERE ` + where + ` ORDER BY ` + order + ` LIMIT ? OFFSET ?`
