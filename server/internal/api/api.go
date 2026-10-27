@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/eduardoddddddd/YourFlix/server/internal/compat"
+	"github.com/eduardoddddddd/YourFlix/server/internal/facets"
 	"github.com/eduardoddddddd/YourFlix/server/internal/images"
 	"github.com/eduardoddddddd/YourFlix/server/internal/probe"
 	"github.com/eduardoddddddd/YourFlix/server/internal/store"
@@ -27,12 +28,16 @@ type Server struct {
 	Images   *images.Cache
 	Subs     *subs.Extractor
 	Profile  *compat.Profile
+	Facets   *facets.Index // índice de categorías; si es nil, Handler lo crea
 	Version  string
 	ServerID string
 	Log      *log.Logger
 }
 
 func (s *Server) Handler() http.Handler {
+	if s.Facets == nil {
+		s.Facets = facets.New(s.DB)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/ping", s.ping)
 	mux.HandleFunc("GET /api/v1/titles", s.titles)
@@ -46,6 +51,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/progress/{id}", s.putProgress)
 	mux.HandleFunc("GET /api/v1/sources", s.sources)
 	mux.HandleFunc("GET /api/v1/genres", s.genres)
+	mux.HandleFunc("GET /api/v1/facets", s.facets)
 	mux.HandleFunc("GET /api/v1/continue", s.continueWatching)
 	return s.lanOnly(cors(mux))
 }
@@ -106,7 +112,21 @@ func (s *Server) titles(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	off, _ := strconv.Atoi(q.Get("offset"))
 	lim, _ := strconv.Atoi(q.Get("limit"))
-	items, total, err := s.DB.ListTitles(store.TitleQuery{Kind: q.Get("kind"), Q: q.Get("q"), Sort: q.Get("sort"), Genre: q.Get("genre"), Offset: off, Limit: lim})
+	tq := store.TitleQuery{Kind: q.Get("kind"), Q: q.Get("q"), Sort: q.Get("sort"), Genre: q.Get("genre"), Offset: off, Limit: lim}
+	// Filtros del índice de categorías (director, actor, país, década…) y orden aleatorio estable.
+	if f := facets.ParseFilter(q); f.Active() || tq.Sort == "random" {
+		ids, err := s.Facets.Match(f)
+		if err != nil {
+			s.fail(w, err)
+			return
+		}
+		if tq.Sort == "random" {
+			seed, _ := strconv.ParseInt(q.Get("seed"), 10, 64)
+			ids, tq.Sort = facets.Shuffle(ids, seed), "ids"
+		}
+		tq.IDs = ids
+	}
+	items, total, err := s.DB.ListTitles(tq)
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -183,12 +203,83 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, fo)
 	}
+	links, err := s.links(t)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 	writeJSON(w, map[string]any{
 		"title":    t,
+		"links":    links,
 		"poster":   imgURL(t.ID, "poster", t.Poster, 600),
 		"backdrop": imgURL(t.ID, "backdrop", t.Backdrop, 1920),
 		"files":    out,
 	})
+}
+
+// link: un dato de la ficha que lleva a la lista filtrada, con cuántos títulos del mismo
+// tipo lo comparten (los clientes muestran el número si es 2 o más).
+type link struct {
+	Name  string `json:"name"`
+	Value string `json:"value,omitempty"` // valor del filtro si no es el propio nombre (década, duración)
+	Count int    `json:"count"`
+}
+
+// links: fichas navegables. Director, reparto, país (en castellano), géneros, año, década
+// y tramo de duración, con su recuento dentro de Películas o de Series.
+func (s *Server) links(t *store.Title) (map[string]any, error) {
+	out := map[string]any{}
+	e, err := s.Facets.Entry(t.ID)
+	if err != nil || e == nil {
+		return out, err // sin archivos disponibles: no sale en las listas
+	}
+	c, err := s.Facets.Counts(t.Kind)
+	if err != nil {
+		return nil, err
+	}
+	list := func(names []string, n map[string]int) []link {
+		l := []link{}
+		for _, x := range names {
+			l = append(l, link{Name: x, Count: n[x]})
+		}
+		return l
+	}
+	out["director"] = list(e.Directors, c.Director)
+	out["cast"] = list(e.Cast, c.Actor)
+	out["country"] = list(e.Countries, c.Country)
+	out["genres"] = list(e.Genres, c.Genre)
+	if e.Year != "" {
+		out["year"] = link{Name: e.Year, Count: c.Year[e.Year]}
+	}
+	if e.Decade != "" {
+		out["decade"] = link{Name: facets.Label("decade", e.Decade), Value: e.Decade, Count: c.Decade[e.Decade]}
+	}
+	if e.RuntimeBand != "" {
+		out["runtime"] = link{Name: facets.Label("runtime", e.RuntimeBand), Value: e.RuntimeBand, Count: c.Runtime[e.RuntimeBand]}
+	}
+	q := []link{}
+	for _, v := range e.Quality {
+		q = append(q, link{Name: facets.Label("quality", v), Value: v})
+	}
+	out["quality"] = q
+	return out, nil
+}
+
+// facets: «Filtrar por». Cada categoría con sus valores y recuentos entre los títulos que
+// cumplen los filtros ya puestos. only=director,actor limita las categorías; all=1 incluye
+// los actores con un solo título.
+func (s *Server) facets(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var only []string
+	if o := q.Get("only"); o != "" {
+		only = strings.Split(o, ",")
+	}
+	total, fs, err := s.Facets.Facets(facets.ParseFilter(q), only, q.Get("all") == "1")
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"total": total, "facets": fs})
 }
 
 func (s *Server) titleImage(w http.ResponseWriter, r *http.Request) {

@@ -185,11 +185,24 @@ const lastFileAt = `(SELECT MAX(f.added_at) FROM files f WHERE f.title_id=t.id A
 type TitleQuery struct {
 	Kind, Q, Sort, Genre string
 	Offset, Limit        int
+	// IDs restringe la lista a esos títulos (nil = sin restricción; vacío = ninguno). Lo
+	// rellena el índice de categorías. Con Sort "ids" se respeta su orden (aleatorio del kiosco).
+	IDs []string
 }
 
 func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 	where := `EXISTS (SELECT 1 FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL)`
 	var args []any
+	from := `titles t`
+	if tq.IDs != nil {
+		ids, _ := json.Marshal(tq.IDs)
+		if tq.Sort == "ids" {
+			from = `titles t JOIN json_each(?) j ON j.value=t.id`
+		} else {
+			where += ` AND t.id IN (SELECT value FROM json_each(?))`
+		}
+		args = append(args, string(ids))
+	}
 	if tq.Kind != "" {
 		where += ` AND t.kind=?`
 		args = append(args, tq.Kind)
@@ -207,7 +220,7 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		args = append(args, norm, norm, like, like)
 	}
 	var total int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM titles t WHERE `+where, args...).Scan(&total); err != nil {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM `+from+` WHERE `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	order := `t.norm`
@@ -218,6 +231,12 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		order = lastFileAt + ` DESC, t.norm`
 	case "rating":
 		order = `COALESCE(json_extract(t.meta,'$.rating'),0) DESC, t.norm`
+	case "runtime": // de la más corta a la más larga; sin duración, al final
+		order = `COALESCE(json_extract(t.meta,'$.runtime'),0)<=0, json_extract(t.meta,'$.runtime'), t.norm`
+	case "ids":
+		if tq.IDs != nil {
+			order = `j.key`
+		}
 	}
 	if tq.Limit <= 0 || tq.Limit > 500 {
 		tq.Limit = 60
@@ -225,7 +244,7 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 	q := `SELECT t.id,t.kind,t.title,t.year,t.meta,t.poster,t.backdrop,COALESCE(` + lastFileAt + `,t.added_at),t.match_source,
 		(SELECT COUNT(*) FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL),
 		(SELECT group_concat(DISTINCT s.label) FROM files f JOIN sources s ON s.id=f.source_id WHERE f.title_id=t.id AND f.missing_since IS NULL)
-		FROM titles t WHERE ` + where + ` ORDER BY ` + order + ` LIMIT ? OFFSET ?`
+		FROM ` + from + ` WHERE ` + where + ` ORDER BY ` + order + ` LIMIT ? OFFSET ?`
 	rows, err := db.Query(q, append(args, tq.Limit, tq.Offset)...)
 	if err != nil {
 		return nil, 0, err

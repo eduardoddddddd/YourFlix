@@ -14,7 +14,22 @@ La TV lo usa para descubrir el servidor y comprobar que sigue siendo el mismo (`
 
 ## `GET /titles`
 
-Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y ficha: director, reparto…), `sort` (`az` por defecto | `year` | `added` | `rating`), `genre` (nombre exacto de `GET /genres`), `offset`, `limit` (60 por defecto, máx. 500). Solo devuelve títulos con algún archivo disponible.
+Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y ficha: director, reparto…), `sort` (`az` por defecto | `year` | `added` | `rating` | `runtime` | `random`), `genre` (nombre exacto de `GET /genres`), `offset`, `limit` (60 por defecto, máx. 500). Solo devuelve títulos con algún archivo disponible.
+
+**Filtros de categorías** (añadidos el 27-10-2026; sin ellos la respuesta es la de siempre). Se combinan con Y entre sí y con `kind`, `q` y `genre`; los que admiten lista se pueden repetir (`actor=A&actor=B` = los dos):
+
+| Parámetro | Valor |
+|---|---|
+| `director`, `actor`, `person` | Nombre exacto, como en la ficha. `person` = director **o** actor |
+| `country` | En castellano (`España`) o como lo da TMDB (`Spain`) |
+| `year` · `decade` | `1987` · `1980` (también `80` o `1980s`) |
+| `runtime` | `short` (< 90 min) · `mid` (90–120) · `long` (> 120). Sin duración conocida no entra en ninguno |
+| `rating` | Nota TMDB mínima (`7` = 7 o más) |
+| `quality` | `4k` · `hdr` · `1080` · `720` · `sd` (de alguna copia disponible) |
+| `audio` · `subs` | Idioma ISO 639-2 (`spa`, `eng`, `fre`…; `es`/`en` también valen). `subs`: solo pistas internas de **texto** |
+| `state` | `unwatched` · `partial` · `watched`. Película vista = alguna copia vista; serie vista = todos los capítulos vistos; a medias = algún progreso (≥ 60 s o visto) sin estar vista |
+
+`sort=runtime`: de la más corta a la más larga, las que no tienen duración al final. `sort=random&seed=N`: orden aleatorio **estable** para esa semilla (misma semilla, mismo orden; las páginas con `offset` no repiten ni se saltan títulos). Sin `seed`, semilla 0.
 
 ```json
 {"total":1,"offset":0,"items":[{
@@ -46,10 +61,31 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
    "stream":"/api/v1/files/eaf3b7aec499/stream"}]}
 ```
 
+- `links` (añadido el 27-10-2026; `meta` no cambia): los datos de la ficha que llevan a una lista filtrada, con `count` = cuántos títulos **del mismo tipo** (películas o series) lo comparten. El país ya en castellano. `value` es lo que se pasa al filtro cuando no es el propio `name`:
+  `"links":{"director":[{"name":"Ridley Scott","count":6}],"cast":[{"name":"Harrison Ford","count":7},…],"country":[{"name":"Estados Unidos","count":229}],"genres":[{"name":"Drama","count":120}],"year":{"name":"1982","count":4},"decade":{"name":"Años 80","value":"1980","count":61},"runtime":{"name":"De 90 a 120 min","value":"mid","count":140},"quality":[{"name":"1080p","value":"1080","count":0}]}`
+  Vacío (`{}`) si el título no tiene archivos disponibles.
 - Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`. Si TMDB conoce el capítulo, `episodeInfo` trae `name`, `overview`, `airDate` y `still` (URL de la foto del capítulo):
   `"season":1,"episode":1,"episodeInfo":{"name":"El sistema","overview":"Carmy intenta…","still":"/api/v1/files/9e190eab8098/still?w=300","airDate":"2022-06-23"}`
 - `compat.status`: `direct` (tal cual) · `warn` (se reproduce, con avisos) · `optimize` (p. ej. solo DTS: **sin sonido** en la TV). Lo calcula el perfil `profiles/samsung-ls01b-2022.json`.
 - `subtitles[].text: false` = imagen (PGS/DVD): AVPlay no la entrega.
+
+## `GET /facets`
+
+«Filtrar por»: cada categoría con sus valores y cuántos títulos tiene cada uno, **contando solo los que cumplen los filtros ya puestos** (mismos parámetros que `/titles`: con `director=Ridley Scott`, `decade` trae solo sus décadas). `only=director,actor` limita las categorías que se devuelven. Los actores con un solo título se omiten salvo con `all=1`.
+
+```json
+{"total":6,"facets":{
+  "director":[{"value":"Ridley Scott","count":3},…],
+  "decade":[{"value":"2000","name":"Años 2000","count":1},{"value":"1980","name":"Años 80","count":1}],
+  "runtime":[{"value":"short","name":"Menos de 90 min","count":1},…],
+  "rating":[{"value":"6","name":"6 o más","count":6},{"value":"7","name":"7 o más","count":5},{"value":"8","name":"8 o más","count":2}],
+  "audio":[{"value":"spa","name":"Castellano","count":4},…],
+  "state":[{"value":"unwatched","name":"Sin ver","count":4},…]}}
+```
+
+Categorías, en este orden: `genre`, `director`, `actor`, `country`, `decade`, `year`, `runtime`, `rating`, `quality`, `audio`, `subs`, `state`. `name` es el texto para mostrar cuando `value` es un código. Orden de los valores: por número de títulos (y alfabético) en género, personas, país e idiomas; de más reciente a más antiguo en año y década; fijo en duración, nota, calidad y estado. Los valores con 0 títulos no salen.
+
+El índice vive en memoria (`internal/facets`): se rehace solo cuando cambia la huella de las tablas `titles` y `files` (escaneo, identificación, edición en la admin); el estado se lee del progreso en cada petición.
 
 ## `GET /titles/{id}/poster?w=` · `GET /titles/{id}/backdrop?w=`
 
