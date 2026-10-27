@@ -1,4 +1,4 @@
-/* Arranque y rutas (#/…): Inicio, Películas, Series, Buscar, Ficha y Reproductor. */
+/* Arranque y rutas (#/…): Inicio, Películas, Series, Kiosco, Buscar, Ficha y Reproductor. */
 (function (YF) {
   'use strict';
   var S = YF.screens, main = document.getElementById('main');
@@ -15,7 +15,7 @@
     return caps;
   };
 
-  var NAV = { '': 'home', peliculas: 'movies', series: 'series', buscar: 'search', titulo: '', ver: '' };
+  var NAV = { '': 'home', peliculas: 'movies', series: 'series', kiosco: 'kiosk', buscar: 'search', titulo: '', ver: '' };
 
   function render() {
     var r = YF.parseRoute(location.hash), name = r.parts[0] || '';
@@ -32,8 +32,9 @@
     if (key === current && !fromPlayer) return; // al volver del reproductor se repinta (progreso nuevo)
     show(key, function () {
       switch (name) {
-        case 'peliculas': return S.grid(main, 'movie', r.query);
-        case 'series': return S.grid(main, 'series', r.query);
+        case 'peliculas': return S.grid(main, 'movie', r.query, r.lists);
+        case 'series': return S.grid(main, 'series', r.query, r.lists);
+        case 'kiosco': return S.kiosk(main, r.query, r.lists);
         case 'buscar': return S.search(main, r.query);
         case 'titulo': return S.detail(main, r.parts[1], r.query);
         default: return S.home(main);
@@ -52,7 +53,8 @@
     document.title = 'YourFlix';
     window.scrollTo(0, 0);
     var p = draw() || Promise.resolve();
-    p.then(function () { if (current === key && scrolls[key]) window.scrollTo(0, scrolls[key]); });
+    // true = la pantalla ya se ha situado sola (la lista, en la tarjeta de la que se salió).
+    p.then(function (placed) { if (current === key && scrolls[key] && placed !== true) window.scrollTo(0, scrolls[key]); });
   }
 
   // Volver desde el reproductor: atrás en el historial si venimos de la web; si no, a la ficha.

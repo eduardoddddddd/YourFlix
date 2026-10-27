@@ -19,11 +19,17 @@
   api.get = function (path) { return request('GET', path); };
   api.url = function (path) { return path ? api.base + path : ''; };
 
-  api.titles = function (q) {
+  // Los valores en lista se mandan como parámetro repetido (director=A&director=B).
+  function qs(q) {
     var parts = [];
-    Object.keys(q || {}).forEach(function (k) { if (q[k] !== '' && q[k] != null) parts.push(k + '=' + encodeURIComponent(q[k])); });
-    return api.get('/titles' + (parts.length ? '?' + parts.join('&') : ''));
-  };
+    Object.keys(q || {}).forEach(function (k) {
+      [].concat(q[k]).forEach(function (v) { if (v !== '' && v != null) parts.push(k + '=' + encodeURIComponent(v)); });
+    });
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+  api.titles = function (q) { return api.get('/titles' + qs(q)); };
+  // Categorías de «Filtrar por» con sus recuentos (teniendo en cuenta los filtros puestos).
+  api.facets = function (q) { return api.get('/facets' + qs(q)); };
   api.title = function (id) { return api.get('/titles/' + encodeURIComponent(id)); };
   api.subtitles = function (fileId) { return api.get('/files/' + encodeURIComponent(fileId) + '/subtitles'); };
   api.vttURL = function (fileId, sid) { return api.base + '/api/v1/files/' + encodeURIComponent(fileId) + '/vtt/' + encodeURIComponent(sid); };

@@ -1,4 +1,4 @@
-/* Pantallas: Inicio, Películas, Series, Búsqueda y Ficha. Cada una pinta en un contenedor y
+/* Pantallas: Inicio, Películas, Series (con «Filtrar por»), Búsqueda y Ficha (con enlaces). El Kiosco, en kiosk.js. Cada una pinta en un contenedor y
  * devuelve una promesa. Los datos van siempre por textContent. */
 (function (YF) {
   'use strict';
@@ -20,6 +20,7 @@
     next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
     left: 'M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z',
     right: 'M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
+    kiosk: 'M4 6h16v10H4V6zm-2-2v14h20V4H2zm8 4.5v5l4-2.5-4-2.5zM7 20h10v2H7z',
     search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
     restart: 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z'
   };
@@ -106,6 +107,7 @@
   // ---------- Tarjetas ----------
   function posterCard(t) {
     var a = link('#/titulo/' + encodeURIComponent(t.id), 'card', t.title + (t.year ? ' (' + t.year + ')' : ''));
+    a.dataset.id = t.id;
     var art = el('div', 'art');
     if (t.poster) {
       var i = img(t.poster, '', '');
@@ -216,71 +218,227 @@
   }
 
   // ---------- Películas / Series ----------
-  var SORTS = [['az', 'A → Z'], ['added', 'Añadidas'], ['year', 'Por año'], ['rating', 'Valoración']];
-  var genresCache = null;
+  var SORTS = [['az', 'A → Z'], ['added', 'Añadidas'], ['year', 'Por año'], ['rating', 'Valoración'], ['runtime', 'Duración']];
+  // «Filtrar por»: cada botón abre un desplegable con uno o varios grupos [categoría de /facets, clave en la dirección, título].
+  var CATS = [
+    { label: 'Género', groups: [['genre', 'genero', '']] },
+    { label: 'Director', groups: [['director', 'director', '']] },
+    { label: 'Actor', groups: [['actor', 'actor', '']], all: true },
+    { label: 'Año/Década', groups: [['decade', 'decada', 'Décadas'], ['year', 'anio', 'Años']] },
+    { label: 'País', groups: [['country', 'pais', '']] },
+    { label: 'Más', groups: [['runtime', 'duracion', 'Duración'], ['rating', 'nota', 'Nota'], ['quality', 'calidad', 'Calidad'],
+      ['audio', 'audio', 'Audio'], ['subs', 'subs', 'Subtítulos'], ['state', 'estado', 'Estado']] }
+  ];
+  var MAX_OPTS = 300;
+  // Tema 1: por dirección, cuántos títulos había cargados y qué tarjeta se abrió (para volver a ella).
+  var gridMemo = {};
 
-  S.grid = function (box, kind, query) {
-    var routeName = kind === 'series' ? 'series' : 'peliculas';
-    var q = { kind: kind, sort: query.orden || 'az', genre: query.genero || '', offset: 0, limit: 60 };
+  S.grid = function (box, kind, query, lists) {
+    var routeName = kind === 'series' ? 'series' : 'peliculas', label = kind === 'series' ? 'Series' : 'Películas';
+    var filters = YF.readFilters(lists || {});
+    var sort = query.orden || 'az';
+    var key = location.hash || '#/' + routeName, back = gridMemo[key];
+    var q = YF.filterQuery(filters, true, { kind: kind, sort: sort, offset: 0, limit: 60 });
+    var facets = null, allActors = null, drop = null;
+    function href(fs, s) { return YF.route([routeName], YF.filterQuery(fs, false, { orden: (s || sort) === 'az' ? '' : (s || sort) })); }
+    function go(fs) { closeDrop(); location.hash = href(fs); } // cada filtro, una entrada del historial: Atrás lo quita
+
     YF.clear(box);
     var head = el('div', 'page-head');
-    head.appendChild(el('h1', '', kind === 'series' ? 'Series' : 'Películas'));
-    var filters = el('div', 'filters');
-    var chips = el('div', 'chips');
+    var h1 = el('h1', '', YF.listHeading(label, filters));
+    var count = el('span', 'count');
+    h1.appendChild(count);
+    head.appendChild(h1);
+
+    var by = el('div', 'filter-by');
+    by.appendChild(el('span', 'lbl', 'Filtrar por'));
+    var byBtns = el('div', 'chips');
+    CATS.forEach(function (c) {
+      var n = filters.filter(function (f) { return c.groups.some(function (g) { return g[1] === f.k; }); }).length;
+      var b = el('button', 'chip drop' + (n ? ' on' : ''), c.label + (n ? ' · ' + n : ''));
+      b.type = 'button';
+      b.setAttribute('aria-haspopup', 'true');
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('click', function (e) { e.stopPropagation(); if (drop && drop.btn === b) closeDrop(); else openDrop(c, b); });
+      byBtns.appendChild(b);
+    });
+    by.appendChild(byBtns);
+    head.appendChild(by);
+
+    if (filters.length) {
+      var act = el('div', 'active-filters');
+      act.setAttribute('aria-label', 'Filtros activos');
+      filters.forEach(function (f) {
+        var t = YF.filterLabel(f.k, f.v);
+        var p = el('button', 'pill', t);
+        p.type = 'button';
+        p.setAttribute('aria-label', 'Quitar el filtro ' + t);
+        p.appendChild(el('span', 'x', '✕'));
+        p.addEventListener('click', function () { go(YF.withoutFilter(filters, f.k, f.v)); });
+        act.appendChild(p);
+      });
+      if (filters.length > 1) { var clr = el('button', 'pill clear', 'Quitar todos'); clr.type = 'button'; clr.addEventListener('click', function () { go([]); }); act.appendChild(clr); }
+      act.appendChild(linkButton('Ver en kiosco', YF.route(['kiosco'], YF.filterQuery(filters, false, { tipo: routeName })), 'kiosk-btn', 'kiosk'));
+      head.appendChild(act);
+    }
+
+    var chips = el('div', 'chips sorts');
     chips.setAttribute('role', 'group');
     chips.setAttribute('aria-label', 'Orden');
     SORTS.forEach(function (o) {
-      var c = el('button', 'chip' + (q.sort === o[0] ? ' on' : ''), o[1]);
+      var c = el('button', 'chip' + (sort === o[0] ? ' on' : ''), o[1]);
       c.type = 'button';
-      c.setAttribute('aria-pressed', q.sort === o[0] ? 'true' : 'false');
-      c.addEventListener('click', function () { location.replace(YF.route([routeName], { orden: o[0], genero: q.genre })); });
+      c.setAttribute('aria-pressed', sort === o[0] ? 'true' : 'false');
+      c.addEventListener('click', function () { location.replace(href(filters, o[0])); });
       chips.appendChild(c);
     });
-    filters.appendChild(chips);
-    var sel = el('select', 'select');
-    sel.setAttribute('aria-label', 'Género');
-    var all = el('option', '', 'Todos los géneros');
-    all.value = '';
-    sel.appendChild(all);
-    sel.addEventListener('change', function () { location.replace(YF.route([routeName], { orden: q.sort, genero: sel.value })); });
-    filters.appendChild(sel);
-    var count = el('span', 'count');
-    filters.appendChild(count);
-    head.appendChild(filters);
+    head.appendChild(chips);
     box.appendChild(head);
     var grid = el('div', 'grid');
     box.appendChild(grid);
     var sentinel = el('div', 'sentinel');
     box.appendChild(sentinel);
+    grid.addEventListener('click', function (e) {
+      var card = e.target.closest && e.target.closest('.card');
+      if (card) gridMemo[key] = { n: q.offset, id: card.dataset.id };
+    });
 
-    (genresCache ? Promise.resolve(genresCache) : api.get('/genres')).then(function (g) {
-      genresCache = g || [];
-      genresCache.forEach(function (x) {
-        var o = el('option', '', x.name);
-        o.value = x.name;
-        if (x.name === q.genre) o.selected = true;
-        sel.appendChild(o);
+    var facetQ = YF.filterQuery(filters, true, { kind: kind });
+    var facetsP = api.facets(facetQ).then(function (r) { facets = r.facets || {}; }).catch(function () { facets = {}; });
+
+    // ---- Desplegable con búsqueda ----
+    function closeDrop() {
+      if (!drop) return;
+      drop.btn.setAttribute('aria-expanded', 'false');
+      if (drop.panel.parentNode) drop.panel.parentNode.removeChild(drop.panel);
+      drop = null;
+    }
+    function openDrop(cat, btn) {
+      closeDrop();
+      var panel = el('div', 'fdrop');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Filtrar por ' + cat.label);
+      var top = el('div', 'fdrop-top');
+      top.appendChild(el('h3', '', cat.label));
+      var allBtn = null;
+      if (cat.all) {
+        allBtn = el('button', 'chip small', 'Todos');
+        allBtn.type = 'button';
+        allBtn.setAttribute('aria-pressed', allActors ? 'true' : 'false');
+        if (allActors) allBtn.classList.add('on');
+        allBtn.title = 'Ver también los actores con un solo título';
+        top.appendChild(allBtn);
+      }
+      var x = el('button', 'fdrop-close', '✕');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Cerrar');
+      x.addEventListener('click', closeDrop);
+      top.appendChild(x);
+      panel.appendChild(top);
+      var input = el('input', 'fdrop-search');
+      input.type = 'search';
+      input.placeholder = 'Buscar…';
+      input.autocomplete = 'off';
+      input.setAttribute('aria-label', 'Buscar en ' + cat.label);
+      panel.appendChild(input);
+      var list = el('div', 'fdrop-list');
+      panel.appendChild(list);
+      by.appendChild(panel);
+      btn.setAttribute('aria-expanded', 'true');
+      drop = { btn: btn, panel: panel };
+      panel.addEventListener('click', function (e) { e.stopPropagation(); });
+
+      function values(g) {
+        var src = g[0] === 'actor' && allActors ? allActors : facets;
+        return (src && src[g[0]]) || [];
+      }
+      function draw() {
+        YF.clear(list);
+        if (!facets) { list.appendChild(el('p', 'fdrop-msg', 'Cargando…')); return; }
+        var text = YF.fold(input.value.trim()), shown = 0, hidden = 0;
+        cat.groups.forEach(function (g) {
+          var vs = values(g).filter(function (v) { return !text || YF.fold(v.name || v.value).indexOf(text) >= 0; });
+          if (!vs.length) return;
+          if (cat.groups.length > 1) list.appendChild(el('div', 'fdrop-group', g[2]));
+          vs.forEach(function (v) {
+            if (shown >= MAX_OPTS) { hidden++; return; }
+            shown++;
+            var on = YF.hasFilter(filters, g[1], v.value);
+            var o = el('button', 'fopt' + (on ? ' on' : ''));
+            o.type = 'button';
+            o.setAttribute('aria-pressed', on ? 'true' : 'false');
+            o.appendChild(el('span', 'ck', on ? '✓' : ''));
+            o.appendChild(el('span', 'nm', v.name || v.value));
+            o.appendChild(el('span', 'n', String(v.count)));
+            o.addEventListener('click', function () { go(on ? YF.withoutFilter(filters, g[1], v.value) : YF.withFilter(filters, g[1], v.value)); });
+            list.appendChild(o);
+          });
+        });
+        if (hidden) list.appendChild(el('p', 'fdrop-msg', 'Y ' + hidden + ' más: escribe para buscar.'));
+        if (!shown) list.appendChild(el('p', 'fdrop-msg', text ? 'Nada con «' + input.value.trim() + '».' : 'Nada que elegir con los filtros puestos.'));
+      }
+      input.addEventListener('input', draw);
+      // ▲▼ entre la caja y las opciones; Escape cierra.
+      panel.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); closeDrop(); btn.focus(); return; }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        var opts = Array.prototype.slice.call(list.querySelectorAll('.fopt'));
+        if (!opts.length) return;
+        e.preventDefault();
+        var i = opts.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') (opts[i + 1] || opts[opts.length - 1]).focus();
+        else if (i <= 0) input.focus(); else opts[i - 1].focus();
       });
-    }).catch(function () {});
+      if (allBtn) allBtn.addEventListener('click', function () {
+        if (allActors) { allActors = null; allBtn.classList.remove('on'); allBtn.setAttribute('aria-pressed', 'false'); draw(); return; }
+        allBtn.disabled = true;
+        api.facets(YF.filterQuery(filters, true, { kind: kind, only: 'actor', all: 1 })).then(function (r) {
+          allActors = r.facets || {};
+          allBtn.classList.add('on'); allBtn.setAttribute('aria-pressed', 'true');
+        }).catch(function (e) { YF.toast('No se pudo cargar: ' + e.message); }).then(function () { allBtn.disabled = false; draw(); });
+      });
+      draw();
+      if (!facets) facetsP.then(function () { if (drop && drop.panel === panel) draw(); });
+      if (window.matchMedia('(hover: hover)').matches) input.focus();
+    }
+    function outside() { closeDrop(); }
+    document.addEventListener('click', outside);
 
+    // ---- Rejilla con carga por páginas ----
     var total = 1, busy = false;
-    function more() {
+    function more(limit) {
       if (busy || q.offset >= total) return Promise.resolve();
       busy = true;
+      q.limit = limit || 60;
       return api.titles(q).then(function (r) {
         total = r.total;
         count.textContent = r.total + (r.total === 1 ? ' título' : ' títulos');
+        document.title = YF.listHeading(label, filters) + ' · YourFlix';
         r.items.forEach(function (t) { grid.appendChild(posterCard(t)); });
         q.offset += r.items.length;
         busy = false;
         if (!r.items.length) total = q.offset;
-        if (!grid.children.length) grid.appendChild(el('div', 'empty', 'Nada por aquí.'));
-      }).catch(function (e) { busy = false; YF.toast('No se pudo cargar: ' + e.message); });
+        if (!grid.children.length) grid.appendChild(el('div', 'empty', 'Nada por aquí con estos filtros.'));
+      }).catch(function (e) { busy = false; total = q.offset; YF.toast('No se pudo cargar: ' + e.message); });
+    }
+    // Al volver de una ficha: tantos títulos como había (de 500 en 500) y la vista en la tarjeta de la que se salió.
+    function fill(target) {
+      return more(Math.min(500, Math.max(60, target - q.offset))).then(function () {
+        if (q.offset < target && q.offset < total) return fill(target);
+      });
     }
     var io = new IntersectionObserver(function (en) { if (en[0].isIntersecting) more(); }, { rootMargin: '900px 0px' });
-    io.observe(sentinel);
-    S.cleanup = function () { io.disconnect(); };
-    return more();
+    S.cleanup = function () { io.disconnect(); document.removeEventListener('click', outside); closeDrop(); };
+    return fill(back ? back.n : 60).then(function () {
+      io.observe(sentinel);
+      if (!back || !back.id) return false;
+      var card = null;
+      Array.prototype.some.call(grid.children, function (c) { if (c.dataset && c.dataset.id === back.id) { card = c; return true; } return false; });
+      if (!card) return false;
+      card.scrollIntoView({ block: 'center' });
+      try { card.focus({ preventScroll: true }); } catch (_) { card.focus(); }
+      return true; // la posición ya está puesta: app.js no restaura el desplazamiento en píxeles
+    });
   };
 
   // ---------- Buscar ----------
@@ -373,12 +531,43 @@
       var ppl = el('div', 'people');
       if (meta.director && meta.director.length) { ppl.appendChild(document.createTextNode(t.kind === 'series' ? 'Creada por ' : 'Dirección ')); ppl.appendChild(el('b', '', meta.director.join(', '))); }
       if (meta.cast && meta.cast.length) { ppl.appendChild(document.createTextNode((ppl.childNodes.length ? '  ·  ' : '') + 'Reparto ')); ppl.appendChild(el('b', '', meta.cast.slice(0, 6).join(', '))); }
-      if (ppl.childNodes.length) info.appendChild(ppl);
+      if (d.links) info.appendChild(linkRows(t, d.links)); // servidor con categorías: enlaces
+      else if (ppl.childNodes.length) info.appendChild(ppl);
       if (!files.length) { info.appendChild(el('p', 'how none', 'Ningún archivo de este título está disponible ahora.')); return; }
       if (t.kind === 'series') renderSeries(wrap, info, t, files, caps, query);
       else renderMovie(info, t, files, caps, query);
     }).catch(function (e) { errorBox(box, e.status === 404 ? 'Este título ya no existe.' : 'No se pudo cargar la ficha (' + e.message + ').', e.status === 404 ? null : function () { S.detail(box, id, query); }); });
   };
+
+  // Filas de enlaces de la ficha: cada dato lleva a la lista filtrada. El número, solo si lo comparten 2 o más.
+  function linkRows(t, links) {
+    var route = t.kind === 'series' ? 'series' : 'peliculas', box = el('div', 'links');
+    function a(k, value, name, n) {
+      var q = {};
+      q[k] = value;
+      var x = link(YF.route([route], q), 'tag');
+      x.appendChild(document.createTextNode(name));
+      if (n >= 2) x.appendChild(el('span', 'n', ' (' + n + ')'));
+      return x;
+    }
+    function list(k, items) { return (items || []).filter(function (x) { return x && x.name; }).map(function (x) { return a(k, x.value || x.name, x.name, x.count); }); }
+    function rowOf(lbl, items) {
+      if (!items.length) return;
+      var r = el('div', 'link-row');
+      r.appendChild(el('span', 'lbl', lbl));
+      var v = el('div', 'vals');
+      items.forEach(function (x) { v.appendChild(x); });
+      r.appendChild(v);
+      box.appendChild(r);
+    }
+    rowOf(t.kind === 'series' ? 'Creada por' : 'Dirección', list('director', links.director));
+    rowOf('Reparto', list('actor', links.cast));
+    rowOf('País', list('pais', links.country));
+    rowOf('Año', list('anio', [links.year]).concat(list('decada', [links.decade])));
+    rowOf('Géneros', list('genero', links.genres));
+    rowOf('Duración', list('duracion', [links.runtime]));
+    return box;
+  }
 
   function renderMovie(info, t, files, caps, query) {
     var idx = Math.min(files.length - 1, Math.max(0, parseInt(query.copia, 10) || 0));
@@ -447,4 +636,6 @@
     wrap.appendChild(list);
     draw();
   }
+  // Para otras pantallas (kiosk.js).
+  S.h = { img: img, link: link, button: button, linkButton: linkButton, loading: loading, errorBox: errorBox, playHref: playHref };
 })(window.YF = window.YF || {});
