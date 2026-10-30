@@ -201,6 +201,9 @@ func TestLANOnlyAndAuth(t *testing.T) {
 	if w := e.client(public).do("GET", "/admin/", nil); w.Code != http.StatusForbidden {
 		t.Fatalf("IP pública: %d", w.Code)
 	}
+	if w := e.client("100.74.22.116:1234").do("GET", "/admin/api/status", nil); w.Code != http.StatusUnauthorized {
+		t.Fatalf("Tailscale sin sesión debe pedir contraseña: %d", w.Code)
+	}
 	tvc := e.client(tv)
 	for _, u := range []string{"/admin/api/sources", "/admin/api/browse?path=" + e.dir, "/admin/api/status", "/admin/api/pending", "/admin/api/jobs/events"} {
 		if w := tvc.do("GET", u, nil); w.Code != http.StatusUnauthorized {
