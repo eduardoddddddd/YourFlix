@@ -61,6 +61,15 @@ func TestLANOnly(t *testing.T) {
 	if w := do(h, "GET", "/api/v1/ping", lan, nil, ""); w.Code != 200 {
 		t.Fatalf("LAN: %d", w.Code)
 	}
+	if w := do(h, "GET", "/api/v1/ping", "100.74.22.116:1234", nil, ""); w.Code != 200 {
+		t.Fatalf("Tailscale: %d", w.Code)
+	}
+	if w := do(h, "GET", "/api/v1/ping", "[fd7a:115c:a1e0::1]:1234", nil, ""); w.Code != 200 {
+		t.Fatalf("Tailscale IPv6: %d", w.Code)
+	}
+	if w := do(h, "GET", "/api/v1/ping", "100.128.0.1:1234", nil, ""); w.Code != http.StatusForbidden {
+		t.Fatalf("fuera del rango de Tailscale: %d", w.Code)
+	}
 }
 
 func TestStreamRange(t *testing.T) {

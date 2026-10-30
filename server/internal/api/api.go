@@ -1,5 +1,5 @@
 // Package api expone /api/v1 para la TV (contrato en docs/API.md).
-// Solo LAN: rechaza IP que no sean privadas o de bucle local.
+// Solo LAN: rechaza IP que no sean privadas, de bucle local o de Tailscale.
 package api
 
 import (
@@ -56,11 +56,15 @@ func (s *Server) Handler() http.Handler {
 	return s.lanOnly(cors(mux))
 }
 
+// tailnet es el rango IPv4 de Tailscale (CGNAT, RFC 6598), que IsPrivate no
+// incluye. Su rango IPv6 (fd7a:115c:a1e0::/48) ya es privado.
+var tailnet = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
 func (s *Server) lanOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, _ := net.SplitHostPort(r.RemoteAddr)
 		ip := net.ParseIP(host)
-		if ip == nil || !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()) {
+		if ip == nil || !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || tailnet.Contains(ip)) {
 			http.Error(w, "solo red local", http.StatusForbidden)
 			return
 		}

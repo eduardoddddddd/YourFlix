@@ -71,6 +71,7 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 **27-10-2026 — versión 0.4.0: fichas navegables, «Filtrar por» y Kiosco. Fusionada en `main`, desplegada en el Ally y en la TV, y probada por el usuario en la TV y en la web.** Novedades en [CHANGELOG.md](CHANGELOG.md).
 
+- **Acceso por Tailscale (30-10, 21:16):** el Ally está en la tailnet como `rogally`, `100.97.117.41`. La API y la admin rechazaban esas IP («solo red local»), porque `IsPrivate` no incluye el rango 100.64.0.0/10. Ahora lo admiten; la admin sigue pidiendo contraseña fuera del Ally. Binario nuevo desplegado (vuelta atrás: `yourflix.old.exe`, el de la 0.4.0) con la TV sin uso, y `ping` y `/admin/` responden 200 por `http://100.97.117.41:8787`. Falta que el usuario lo pruebe desde el móvil con datos.
 - **Despliegue (27-10, 23:17):** binario y `web/` nuevos en `C:\YourFlix\servidor`, con la TV sin uso. La vuelta atrás queda en `yourflix.old.exe` y `web-backup-20261027`. App 0.4.0 instalada desde el Mac (`tizen install`, perfil CineT7, mismo ID). El usuario lo probó con el mando y en el navegador: «funciona todo, tv y web».
 - **Comprobado antes de desplegar**, contra una copia de la base de datos real (290 títulos) en `127.0.0.1:8788`:
   - filtros y recuentos (Ridley Scott 6, Harrison Ford 7, España + años 80: 9), países en castellano, y el aleatorio repite el orden con la misma semilla;

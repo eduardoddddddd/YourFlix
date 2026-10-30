@@ -14,6 +14,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -121,10 +122,14 @@ func (a *Admin) routes() {
 	a.mux = m
 }
 
-// ServeHTTP: solo LAN, cabeceras de seguridad y CSRF en lo que cambia algo.
+// tailnet es el rango IPv4 de Tailscale (CGNAT, RFC 6598), que IsPrivate no
+// incluye. Su rango IPv6 (fd7a:115c:a1e0::/48) ya es privado.
+var tailnet = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
+// ServeHTTP: solo LAN (y Tailscale), cabeceras de seguridad y CSRF en lo que cambia algo.
 func (a *Admin) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ip := remoteIP(r)
-	if ip == nil || !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()) {
+	if ip == nil || !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || tailnet.Contains(ip)) {
 		http.Error(w, "solo red local", http.StatusForbidden)
 		return
 	}
