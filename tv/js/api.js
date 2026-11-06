@@ -38,6 +38,12 @@
   api.titles = function (q) { return api.get('/titles' + api.qs(q)); };
   api.facets = function (q) { return api.get('/facets' + api.qs(q)); };
   api.title = function (id) { return api.get('/titles/' + encodeURIComponent(id)); };
+  // Favoritos y Pendientes de ver (comunes con la web). ep = {season, episode} para un capítulo.
+  api.lists = function () { return api.get('/lists'); };
+  api.setList = function (list, titleId, on, ep) {
+    var q = ep && ep.season != null && ep.episode != null ? '?season=' + ep.season + '&episode=' + ep.episode : '';
+    return request(on ? 'PUT' : 'DELETE', api.base + '/api/v1/lists/' + list + '/' + encodeURIComponent(titleId) + q);
+  };
   api.progress = function (fileId, position, duration) {
     return api.put('/progress/' + encodeURIComponent(fileId), { position: position, duration: duration }).catch(function () {});
   };

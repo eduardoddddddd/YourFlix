@@ -69,6 +69,33 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
+**06-11-2026 — versión 0.5.0: Favoritos y Pendientes de ver (rama `feat/listas`). Servidor y web desplegados en el Ally; app de la TV sin instalar.** Novedades en [CHANGELOG.md](CHANGELOG.md); decisión en [ADR-008](docs/DECISIONES.md); API en [docs/API.md](docs/API.md#listas-favoritos-y-pendientes-de-ver-050-adr-008).
+
+- **Hecho:**
+  - **Servidor:** tabla `lists` (título entero o capítulo por temporada y número), `GET /lists`, `PUT|DELETE /lists/{list}/{id}` y `lists` en `/titles` y `/titles/{id}`. Lo visto sale solo de Pendientes; las marcas pasan a la ficha de destino al fusionar fichas. Versión 0.5.0.
+  - **Web:** botones ♥ y + en la ficha, en cada capítulo y en el kiosco; «Mi lista» en el menú; filas en Inicio; ♥ y marca en las carátulas.
+  - **TV, app 0.5.0:** lo mismo con el mando. En la ficha, ♥ y + muestran su texto al tener el foco (así caben junto a Reanudar · Desde el principio). En un capítulo, ▲ lleva a su ♥ y ▼ vuelve a él (atajo nuevo `_nav` en `nav.js`). En el kiosco hay 4 botones. «♥ Mi lista» va en el menú, tras Series.
+- **Probado en el Ally** (servidor de la rama en `127.0.0.1:8795` con una copia de la base de datos real: 402 fichas, 688 archivos; el servidor en uso no se tocó):
+  - `go test ./...` y `go vet ./...`, con tests nuevos de listas: capítulos, errores 400/404, lo visto sale de Pendientes, disco desconectado y fusión de fichas. Tests de la TV (23, 2 nuevos) y de la web (12). `node --check` de todos los JS.
+  - **Web en Edge con Playwright** (`tools/web-demo/e2e-listas.mjs`, 1920 px y 390 px): 22 comprobaciones y 0 errores de JavaScript.
+  - **App de la TV en Edge** a 1920×1080 con el AVPlay simulado y solo teclas (`tools/tv-demo/e2e-listas.mjs`): 23 comprobaciones, 0 errores y 0 cuelgues del simulador.
+  - Capturas en `docs/capturas/listas/`.
+- **Sin probar en la TV real:** la app 0.5.0 no está instalada. Falta ver con el mando la fluidez de los botones sobre las fotos de los capítulos y que Chromium 85 muestre bien ♥ ✓ +.
+- **Notas:**
+  - En el Ally, los puertos 8787–8790 son servidores del usuario (yourflix, yourroms, yourbook, yourmp3). Las pruebas van en el 8795 o más arriba.
+  - `tools/tv-demo/e2e-categorias.mjs` se adaptó al menú nuevo, pero no se volvió a ejecutar: necesita la biblioteca de demostración.
+  - Playwright no está en el repo: se usa `playwright-core` con `PLAYWRIGHT=<ruta>` y `PW_CHANNEL=msedge`.
+- **Despliegue (06-11, 14:47), con permiso y sin conexiones abiertas:**
+  - binario 0.5.0 (de `feat/listas`, aún sin fusionar en `main`) y `web/` en `C:YourFlixservidor`;
+  - vuelta atrás: `yourflix.old.exe` (la versión de Tailscale) y `web-backup-20261106`; el 0.4.0 anterior queda como `yourflix.pre040b.exe`;
+  - comprobado desde `192.168.1.13:8787`: ping 0.5.0, `/lists`, títulos, vídeo con Range 206, «Seguir viendo» intacto, web con «Mi lista» y admin 200.
+- **App de la TV 0.5.0, pendiente.** No se pudo instalar desde el Ally:
+  - la TV estaba en reposo;
+  - su IP de desarrollo es la del Mac;
+  - no había ninguna sesión de Claude en el Mac;
+  - el Ally no tiene credenciales de GitHub para subir la rama.
+- **Siguiente paso:** subir `feat/listas` (o fusionarla en `main`). Después, desde el Mac con la TV encendida: `tizen build-web` + `package -s CineT7` + `install` (mismo ID) y prueba con el monitor CDP.
+
 **27-10-2026 — versión 0.4.0: fichas navegables, «Filtrar por» y Kiosco. Fusionada en `main`, desplegada en el Ally y en la TV, y probada por el usuario en la TV y en la web.** Novedades en [CHANGELOG.md](CHANGELOG.md).
 
 - **Acceso por Tailscale (30-10, 21:16):** el Ally está en la tailnet como `rogally`, `100.97.117.41`. La API y la admin rechazaban esas IP («solo red local»), porque `IsPrivate` no incluye el rango 100.64.0.0/10. Ahora lo admiten; la admin sigue pidiendo contraseña fuera del Ally. Binario nuevo desplegado (vuelta atrás: `yourflix.old.exe`, el de la 0.4.0) con la TV sin uso, y `ping` y `/admin/` responden 200 por `http://100.97.117.41:8787`. Falta que el usuario lo pruebe desde el móvil con datos.

@@ -204,6 +204,7 @@ episodes   (title_id, season, episode, file_id, name, still_img, overview)
 title_files(title_id, file_id, label)          -- versiones/copias de una película
 images     (hash, source_url, w, h, path)
 progress   (file_id, position_s, duration_s, watched, updated_at)
+lists      (list favorites|watchlist, title_id, season, episode, added_at)  -- ADR-008 (06-11-2026)
 jobs       (id, kind, file_id, status, log, created_at, finished_at)
 settings   (key, value)
 ```

@@ -41,6 +41,13 @@
       .catch(function () {});
   };
 
+  // Favoritos y Pendientes de ver (comunes con la TV). ep = {season, episode} para un capítulo.
+  api.lists = function () { return api.get('/lists'); };
+  api.setList = function (list, titleId, on, ep) {
+    var q = ep && ep.season != null && ep.episode != null ? '?season=' + ep.season + '&episode=' + ep.episode : '';
+    return request(on ? 'PUT' : 'DELETE', '/lists/' + list + '/' + encodeURIComponent(titleId) + q);
+  };
+
   // Estado de la conversión en vivo (se pide una vez).
   var remux = null;
   api.remux = function () {

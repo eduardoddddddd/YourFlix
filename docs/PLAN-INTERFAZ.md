@@ -45,7 +45,7 @@
 ## 5. Comodidades
 
 - **Marcar visto / no visto** desde la ficha y desde las listas.
-- **Lista «Para ver»**, compartida entre TV y web (tabla nueva en el servidor).
+- **Lista «Para ver»**, compartida entre TV y web (tabla nueva en el servidor). → **Hecho en 0.5.0** como «Pendientes de ver» y «Favoritos» (ADR-008).
 - **Insignias en las carátulas:** 4K, HDR, VOSE, «a medias» con barra de progreso, «nuevo».
 - **Vista de lista compacta en la web:** tabla con título, año, director, duración y nota, ordenable por columnas.
 - **Series:** «siguiente capítulo» en la ficha y avance de temporada (7/10).

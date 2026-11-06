@@ -81,6 +81,9 @@
     var cands = nav.candidates();
     if (!cands.length) return false;
     if (!nav.current || cands.indexOf(nav.current) < 0) { nav.focus(cands[0]); return true; }
+    // Atajo fijado por la pantalla (botones superpuestos a una tarjeta: ▼ vuelve a la tarjeta).
+    var over = nav.current._nav && nav.current._nav[dir];
+    if (over && cands.indexOf(over) >= 0) { nav.focus(over); return true; }
     var rects = cands.map(function (c) { return c.getBoundingClientRect(); });
     var i = nav.pick(nav.current.getBoundingClientRect(), rects, dir);
     if (i < 0) return false;

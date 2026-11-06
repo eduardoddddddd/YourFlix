@@ -22,7 +22,12 @@
     right: 'M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
     kiosk: 'M4 6h16v10H4V6zm-2-2v14h20V4H2zm8 4.5v5l4-2.5-4-2.5zM7 20h10v2H7z',
     search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
-    restart: 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z'
+    restart: 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z',
+    heart: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+    heartO: 'M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z',
+    add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+    check: 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+    mark: 'M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z'
   };
   var NS = 'http://www.w3.org/2000/svg';
   YF.icon = function (name) {
@@ -104,6 +109,53 @@
   }
   S.loading = loading;
 
+  // ---------- Favoritos y Pendientes de ver ----------
+  var LISTS = {
+    favorites: { title: 'Favoritos', on: ['Favorito', 'heart'], off: ['Favorito', 'heartO'], added: 'Añadido a Favoritos', removed: 'Quitado de Favoritos' },
+    watchlist: { title: 'Pendientes de ver', on: ['En pendientes', 'check'], off: ['Pendiente de ver', 'add'], added: 'Añadido a Pendientes de ver', removed: 'Quitado de Pendientes de ver' }
+  };
+  YF.LISTS = LISTS;
+
+  // listToggle: botón que pone o quita un título (o un capítulo, ep = {season, episode}) de una
+  // lista. state es el array de listas de ese elemento y se actualiza en el sitio. small: solo icono.
+  function listToggle(list, titleId, state, ep, small) {
+    var L = LISTS[list], b = el('button', small ? 'ibtn list-ibtn' : 'btn list-btn');
+    b.type = 'button';
+    function paint() {
+      var on = state.indexOf(list) >= 0, v = on ? L.on : L.off;
+      YF.clear(b);
+      b.appendChild(YF.icon(v[1]));
+      if (!small) b.appendChild(document.createTextNode(v[0]));
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-label', (on ? 'Quitar de ' : 'Añadir a ') + L.title);
+      b.title = (on ? 'Quitar de ' : 'Añadir a ') + L.title;
+    }
+    b.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var on = state.indexOf(list) < 0;
+      if (on) state.push(list); else state.splice(state.indexOf(list), 1);
+      paint();
+      b.disabled = true;
+      api.setList(list, titleId, on, ep).then(function () { YF.toast(on ? L.added : L.removed, 2000); }, function (err) {
+        if (on) state.splice(state.indexOf(list), 1); else state.push(list);
+        paint();
+        YF.toast('No se pudo guardar: ' + err.message);
+      }).then(function () { b.disabled = false; });
+    });
+    paint();
+    return b;
+  }
+
+  // Corazón y marca en la carátula si el título entero está en alguna lista.
+  function listBadges(lists) {
+    if (!lists || !lists.length) return null;
+    var box = el('span', 'list-badges');
+    if (lists.indexOf('favorites') >= 0) { var h = el('span', 'lb fav'); h.appendChild(YF.icon('heart')); h.title = 'En Favoritos'; box.appendChild(h); }
+    if (lists.indexOf('watchlist') >= 0) { var m = el('span', 'lb'); m.appendChild(YF.icon('mark')); m.title = 'En Pendientes de ver'; box.appendChild(m); }
+    return box;
+  }
+
   // ---------- Tarjetas ----------
   function posterCard(t) {
     var a = link('#/titulo/' + encodeURIComponent(t.id), 'card', t.title + (t.year ? ' (' + t.year + ')' : ''));
@@ -116,9 +168,32 @@
       art.appendChild(i);
     } else art.appendChild(el('div', 'ph', t.title));
     if (t.matched === false) art.appendChild(el('span', 'badge-pending', 'sin ficha'));
+    var lb = listBadges(t.lists);
+    if (lb) art.appendChild(lb);
     a.appendChild(art);
     a.appendChild(el('div', 'cap', t.title + (t.year ? ' (' + t.year + ')' : '')));
     return a;
+  }
+
+  // Capítulo de una lista: tarjeta ancha que lo reproduce (o lo reanuda).
+  function listEpisodeCard(e) {
+    var lbl = e.title + ' · ' + YF.epLabel(e) + (e.episodeName ? ' ' + e.episodeName : '');
+    var a = link('#/ver/' + encodeURIComponent(e.titleId) + '/' + encodeURIComponent(e.fileId), 'card wide', 'Ver ' + lbl);
+    var art = el('div', 'art');
+    art.appendChild(img(e.still || e.backdrop || e.poster, '', ''));
+    if (e.watched) art.appendChild(el('span', 'watched', '✓'));
+    else if (e.position > 60) { var bar = el('div', 'pbar'); bar.style.width = Math.min(100, e.position / (e.duration || 1) * 100) + '%'; art.appendChild(bar); }
+    var pb = el('span', 'play-badge');
+    pb.appendChild(YF.icon('play'));
+    art.appendChild(pb);
+    a.appendChild(art);
+    a.appendChild(el('div', 'cap', lbl));
+    return a;
+  }
+
+  // Tarjetas de una lista: títulos y luego capítulos, cada grupo con lo último añadido primero.
+  function listCards(l) {
+    return (l.titles || []).map(posterCard).concat((l.episodes || []).map(listEpisodeCard));
   }
 
   function continueLabel(c) {
@@ -166,15 +241,20 @@
       api.titles({ sort: 'added', limit: 24 }),
       api.titles({ sort: 'rating', kind: 'movie', limit: 24 }),
       api.titles({ kind: 'series', sort: 'rating', limit: 24 }),
-      api.get('/genres').catch(function () { return []; })
+      api.get('/genres').catch(function () { return []; }),
+      api.lists().catch(function () { return {}; })
     ]).then(function (r) {
-      var cont = r[0] || [], added = r[1].items, rated = r[2].items, series = r[3].items, genres = r[4] || [];
+      var cont = r[0] || [], added = r[1].items, rated = r[2].items, series = r[3].items, genres = r[4] || [], lists = r[5] || {};
       YF.clear(box);
       if (!added.length) { box.appendChild(el('div', 'empty', 'La colección está vacía. Añade carpetas en el servidor y escanéalas.')); return; }
       box.appendChild(hero(cont[0], rated[0] || added[0]));
       var rows = el('div', 'rows');
       box.appendChild(rows);
       if (cont.length) rows.appendChild(row('Seguir viendo', cont.map(continueCard)));
+      ['watchlist', 'favorites'].forEach(function (k) {
+        var cards = lists[k] ? listCards(lists[k]) : [];
+        if (cards.length) rows.appendChild(row(LISTS[k].title, cards));
+      });
       rows.appendChild(row('Añadidas recientemente', added.map(posterCard)));
       if (rated.length) rows.appendChild(row('Películas mejor valoradas', rated.map(posterCard)));
       if (series.length) rows.appendChild(row('Series', series.map(posterCard)));
@@ -441,6 +521,31 @@
     });
   };
 
+  // ---------- Mi lista: Pendientes de ver y Favoritos ----------
+  S.mylist = function (box) {
+    loading(box);
+    return api.lists().then(function (r) {
+      YF.clear(box);
+      document.title = 'Mi lista · YourFlix';
+      var head = el('div', 'page-head');
+      head.appendChild(el('h1', '', 'Mi lista'));
+      box.appendChild(head);
+      ['watchlist', 'favorites'].forEach(function (k) {
+        var l = r[k] || {}, titles = l.titles || [], eps = l.episodes || [], n = titles.length + eps.length;
+        var sec = el('section', 'list-section');
+        var h2 = el('h2', '', LISTS[k].title);
+        h2.appendChild(el('span', 'count', n ? String(n) : ''));
+        sec.appendChild(h2);
+        if (!n) sec.appendChild(el('p', 'hint', k === 'favorites'
+          ? 'Aún no hay nada. Pulsa «Favorito» en una ficha o el corazón de un capítulo.'
+          : 'Aún no hay nada. Pulsa «Pendiente de ver» en una ficha o el + de un capítulo. Lo que termines de ver sale solo.'));
+        if (titles.length) { var g = el('div', 'grid'); titles.forEach(function (t) { g.appendChild(posterCard(t)); }); sec.appendChild(g); }
+        if (eps.length) { var ge = el('div', 'grid eps'); eps.forEach(function (e) { ge.appendChild(listEpisodeCard(e)); }); sec.appendChild(ge); }
+        box.appendChild(sec);
+      });
+    }).catch(function (e) { errorBox(box, 'No se pudo cargar tu lista (' + e.message + ').', function () { S.mylist(box); }); });
+  };
+
   // ---------- Buscar ----------
   S.search = function (box, query) {
     YF.clear(box);
@@ -533,9 +638,17 @@
       if (meta.cast && meta.cast.length) { ppl.appendChild(document.createTextNode((ppl.childNodes.length ? '  ·  ' : '') + 'Reparto ')); ppl.appendChild(el('b', '', meta.cast.slice(0, 6).join(', '))); }
       if (d.links) info.appendChild(linkRows(t, d.links)); // servidor con categorías: enlaces
       else if (ppl.childNodes.length) info.appendChild(ppl);
-      if (!files.length) { info.appendChild(el('p', 'how none', 'Ningún archivo de este título está disponible ahora.')); return; }
-      if (t.kind === 'series') renderSeries(wrap, info, t, files, caps, query);
-      else renderMovie(info, t, files, caps, query);
+      var marks = d.lists || [];
+      var listBtns = function () { return [listToggle('favorites', t.id, marks), listToggle('watchlist', t.id, marks)]; };
+      if (!files.length) {
+        info.appendChild(el('p', 'how none', 'Ningún archivo de este título está disponible ahora.'));
+        var nb = el('div', 'btns');
+        listBtns().forEach(function (b) { nb.appendChild(b); });
+        info.appendChild(nb);
+        return;
+      }
+      if (t.kind === 'series') renderSeries(wrap, info, t, files, caps, query, listBtns);
+      else renderMovie(info, t, files, caps, query, listBtns);
     }).catch(function (e) { errorBox(box, e.status === 404 ? 'Este título ya no existe.' : 'No se pudo cargar la ficha (' + e.message + ').', e.status === 404 ? null : function () { S.detail(box, id, query); }); });
   };
 
@@ -569,7 +682,7 @@
     return box;
   }
 
-  function renderMovie(info, t, files, caps, query) {
+  function renderMovie(info, t, files, caps, query, listBtns) {
     var idx = Math.min(files.length - 1, Math.max(0, parseInt(query.copia, 10) || 0));
     var f = query.copia != null ? files[idx] : P.chooseFile(files);
     var tech = el('div');
@@ -580,6 +693,7 @@
       var at = P.resumeAt(f);
       btns.appendChild(linkButton(at ? 'Reanudar desde ' + YF.clock(at) : 'Reproducir', playHref(t, f, null), 'primary', 'play'));
       if (at) btns.appendChild(linkButton('Desde el principio', playHref(t, f, 0), '', 'restart'));
+      listBtns().forEach(function (b) { btns.appendChild(b); });
     }
     info.appendChild(tech);
     info.appendChild(btns);
@@ -593,13 +707,17 @@
     draw();
   }
 
-  function renderSeries(wrap, info, t, files, caps, query) {
+  function renderSeries(wrap, info, t, files, caps, query, listBtns) {
     var next = P.chooseFile(files);
     var at = P.resumeAt(next);
     techBlock(info, next, caps);
     var btns = el('div', 'btns');
     btns.appendChild(linkButton((at ? 'Reanudar ' : 'Ver ') + YF.epLabel(next), playHref(t, next, null), 'primary', 'play'));
+    listBtns().forEach(function (b) { btns.appendChild(b); });
     info.appendChild(btns);
+    // Marcas por capítulo («T×E» → listas); varias copias del mismo capítulo comparten marca.
+    var epMarks = {};
+    files.forEach(function (f) { if (f.season != null && f.episode != null) epMarks[f.season + 'x' + f.episode] = epMarks[f.season + 'x' + f.episode] || (f.lists || []).slice(); });
     var seasons = [];
     files.forEach(function (f) { var n = f.season == null ? 0 : f.season; if (seasons.indexOf(n) < 0) seasons.push(n); });
     seasons.sort(function (a, b) { return a - b; });
@@ -618,7 +736,17 @@
       files.filter(function (f) { return (f.season == null ? 0 : f.season) === season; }).forEach(function (f) {
         var ei = f.episodeInfo || {};
         var name = ei.name || f.label || ('Capítulo ' + (f.episode || ''));
+        var item = el('div', 'episode-item');
         var a = link(playHref(t, f, null), 'episode', 'Ver ' + YF.epLabel(f) + ' ' + name);
+        item.appendChild(a);
+        var mk = f.season != null && f.episode != null ? epMarks[f.season + 'x' + f.episode] : null;
+        if (mk) {
+          var acts = el('div', 'ep-lists');
+          var ep = { season: f.season, episode: f.episode };
+          acts.appendChild(listToggle('favorites', t.id, mk, ep, true));
+          acts.appendChild(listToggle('watchlist', t.id, mk, ep, true));
+          item.appendChild(acts);
+        }
         var art = el('div', 'art');
         if (ei.still) art.appendChild(img(ei.still, '', ''));
         if (f.season != null) art.appendChild(el('span', 'num', YF.epLabel(f)));
@@ -629,7 +757,7 @@
         txt.appendChild(el('div', 'ep-name', name));
         txt.appendChild(el('div', 'ep-desc', ei.overview || YF.clock(f.duration)));
         a.appendChild(txt);
-        list.appendChild(a);
+        list.appendChild(item);
       });
     }
     wrap.appendChild(tabs);
@@ -637,5 +765,5 @@
     draw();
   }
   // Para otras pantallas (kiosk.js).
-  S.h = { img: img, link: link, button: button, linkButton: linkButton, loading: loading, errorBox: errorBox, playHref: playHref };
+  S.h = { img: img, link: link, button: button, linkButton: linkButton, loading: loading, errorBox: errorBox, playHref: playHref, listToggle: listToggle };
 })(window.YF = window.YF || {});

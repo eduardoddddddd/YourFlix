@@ -323,3 +323,27 @@ body.kiosk-on{overflow:hidden}
 @media (max-width:720px){#toast{bottom:calc(90px + var(--safe-b))}}
 body.playing{overflow:hidden}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:2s!important}}
+
+/* Favoritos y Pendientes de ver */
+.btn.list-btn.on{color:var(--gold);border-color:rgba(229,185,92,.55)}
+.btn.list-btn.on svg{fill:var(--gold)}
+.list-ibtn{width:40px;height:40px;background:rgba(9,11,16,.72)}
+.list-ibtn svg{width:22px;height:22px}
+.list-ibtn:hover{background:rgba(9,11,16,.92)}
+.list-ibtn:disabled{opacity:.6}
+.btns .list-ibtn{width:46px;height:46px;background:rgba(255,255,255,.12)}
+.list-badges{position:absolute;left:6px;top:6px;display:flex;gap:4px}
+.list-badges .lb{width:26px;height:26px;border-radius:50%;background:rgba(9,11,16,.8);display:flex;align-items:center;justify-content:center}
+.list-badges .lb svg{width:15px;height:15px;fill:#fff}
+.list-badges .lb.fav svg{fill:var(--gold)}
+.episode-item{position:relative;display:flex}
+.episode-item .episode{flex:1;min-width:0}
+.ep-lists{position:absolute;right:8px;top:8px;display:flex;gap:6px}
+.episode-item .episode .watched{right:auto;left:10px;top:40px}
+.list-section{margin-top:10px}
+.list-section h2{font-size:clamp(20px,2.4vw,28px);margin:8px var(--pad) 0;display:flex;align-items:baseline;gap:10px}
+.list-section h2 .count{font:14px Arial,sans-serif;color:var(--muted);margin-left:0}
+.list-section .hint{margin:8px var(--pad) 20px;color:var(--muted)}
+.grid.eps{grid-template-columns:repeat(auto-fill,minmax(calc(var(--card) * 1.6),1fr));padding-top:0}
+.grid .card.wide{width:auto}
+@media (max-width:720px){#nav a{padding:4px 6px}}

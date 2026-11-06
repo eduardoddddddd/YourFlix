@@ -64,6 +64,20 @@ En cascada: (0) misma huella ya identificada en otra fuente → mismo título (c
 - Sin DRM, sin acceso desde fuera de casa (la web es solo LAN, como la API) y sin elegir calidad: no se promete nada de eso.
 - Pendiente de probar en dispositivos reales contra el Ally: iPhone (Safari nativo, HEVC copiado, pantalla completa con subtítulos), Android (Chrome), Mac (Safari y Chrome), Windows (Edge/Chrome con HEVC y Firefox recodificando); que `h264_amf` respete los fotogramas clave forzados; carga de CPU y tiempos de salto con los archivos de decenas de GB.
 
+## ADR-008 · Listas «Favoritos» y «Pendientes de ver» en el servidor — 06-11-2026
+
+**Contexto.** El usuario quiere marcar cualquier película o capítulo con un corazón o apuntarlo para verlo más tarde, desde la TV y desde la web. PLAN-INTERFAZ §5 ya proponía «Para ver» compartida entre TV y web. La decisión abierta 2 del plan (¿un perfil o varios?) sigue sin cerrar.
+
+**Decisión.**
+- Tabla `lists(list, title_id, season, episode, added_at)` en la base de datos del servidor, no en `localStorage`: así la TV y la web ven lo mismo. Dos listas fijas: `favorites` y `watchlist`. Sin perfiles, como el progreso.
+- Un capítulo se guarda por título + temporada + número (`-1/-1` = el título entero), no por ID de archivo: sobrevive a cambiar la copia por una mejor (PENDIENTES, tema 2) y a un disco desconectado. Al fusionar fichas (`MoveFiles`) las marcas pasan a la de destino.
+- Lo que se termina de ver (> 92 %) sale solo de Pendientes (película o capítulo; la serie entera, no). Favoritos no cambia solo.
+- API solo aditiva: `GET /lists`, `PUT|DELETE /lists/{list}/{id}` y el campo `lists` en `/titles` y `/titles/{id}` (`docs/API.md`). Las apps anteriores siguen funcionando.
+
+**Consecuencias.**
+- Si algún día hay perfiles, la tabla necesitará una columna `profile` (y el progreso también).
+- Un capítulo sin número (fuera de «T×E») no se puede marcar suelto; sí la serie entera.
+
 ## ADR-007 · Administración web en `/admin/`, aparte de `/api/v1` — 24-10-2026
 
 > Numerada 007 porque la 006 queda para el remux en vivo del cliente web (petición 5 del plan), que se hace a la vez en otra rama. Si al fusionar no existe, se puede renumerar.

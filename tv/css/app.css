@@ -217,3 +217,24 @@ html,body{width:1920px;height:1080px;margin:0;overflow:hidden;background:var(--b
 .dialog-card{position:absolute;left:510px;top:360px;width:900px;padding:44px 50px;background:var(--panel);border:2px solid var(--gold);border-radius:22px}
 .dialog-card p{font-size:30px;margin:0 0 30px}
 #toast{position:absolute;z-index:30;left:560px;bottom:70px;width:800px;padding:20px;text-align:center;background:var(--panel2);border:2px solid var(--gold);border-radius:14px;font-size:26px}
+/* Favoritos y Pendientes de ver */
+.btn.on{color:var(--gold);border-color:rgba(229,185,92,.6)}
+.btn.on.focused{color:#111;border-color:#fff}
+.btn.sym{padding:16px 24px;min-width:74px;text-align:center}
+.lbadges{position:absolute;left:8px;top:8px}
+.lbadges .lb{display:inline-block;width:38px;height:38px;line-height:38px;margin-right:6px;text-align:center;border-radius:50%;background:rgba(9,11,16,.85);font-size:22px;color:#fff}
+.lbadges .lb.fav{color:var(--gold)}
+.ep-lists{position:absolute;right:10px;top:10px}
+.mbtn{display:inline-block;width:52px;height:52px;line-height:48px;margin-left:8px;text-align:center;border-radius:50%;background:rgba(9,11,16,.82);border:2px solid rgba(255,255,255,.25);font-size:28px;color:#fff}
+.mbtn.on{color:var(--gold);border-color:rgba(229,185,92,.7)}
+.mbtn.focused{background:var(--gold);color:#201704;border-color:#fff;transform:scale(1.12)}
+.episode .watched{right:auto;left:12px;top:50px}
+.mylist .grid-head{padding-bottom:0}
+.list-h{font:400 38px Georgia,serif;margin:30px 90px 6px;color:var(--text)}
+.list-empty{margin:6px 90px 20px;font-size:24px;color:var(--muted)}
+.grid .card.wide{vertical-align:top}
+.btn.sym .lbl{display:none}
+.btn.sym.focused .lbl{display:inline}
+.btnrow{white-space:nowrap}
+/* En el kiosco (pantalla completa) el aviso va arriba: abajo están sus botones. */
+#app.fullscreen ~ #toast{bottom:auto;top:60px}

@@ -42,6 +42,8 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
 
 `addedAt` (y el orden `sort=added`) = llegada del archivo disponible **más reciente** del título, no la creación de la ficha: una ficha de la semilla que espera su archivo, o una serie con un capítulo nuevo, sube a «Recién añadidas» cuando llega el archivo. En `GET /titles/{id}`, `title.addedAt` sigue siendo la creación de la ficha.
 
+`lists` (0.5.0): listas en las que está el título entero (`favorites`, `watchlist`); no aparece si no está en ninguna.
+
 `matched: false` = ficha provisional deducida del nombre del archivo: TMDB no la identificó con seguridad (pendiente de elegir a mano).
 
 ## `GET /titles/{id}`
@@ -66,6 +68,7 @@ Parámetros: `kind` (`movie` | `series`), `q` (busca en título, original y fich
   Vacío (`{}`) si el título no tiene archivos disponibles.
 - Series: un elemento de `files` por capítulo, ordenados por `season`, `episode`. Si TMDB conoce el capítulo, `episodeInfo` trae `name`, `overview`, `airDate` y `still` (URL de la foto del capítulo):
   `"season":1,"episode":1,"episodeInfo":{"name":"El sistema","overview":"Carmy intenta…","still":"/api/v1/files/9e190eab8098/still?w=300","airDate":"2022-06-23"}`
+- `lists` (0.5.0), en la raíz: listas del título entero, p. ej. `"lists":["favorites"]` (vacío `[]`). En una serie, cada capítulo de `files` trae también `lists` con las suyas (por temporada y número: todas las copias del mismo capítulo comparten marca).
 - `compat.status`: `direct` (tal cual) · `warn` (se reproduce, con avisos) · `optimize` (p. ej. solo DTS: **sin sonido** en la TV). Lo calcula el perfil `profiles/samsung-ls01b-2022.json`.
 - `subtitles[].text: false` = imagen (PGS/DVD): AVPlay no la entrega.
 
@@ -123,6 +126,28 @@ El archivo tal cual, con `Range` (206), `Content-Range`, `Accept-Ranges` y `Cont
 ```
 
 204. Con más del 92 % se marca `watched`. La TV lo envía cada 15 s y al salir.
+
+## Listas: Favoritos y Pendientes de ver (0.5.0, [ADR-008](DECISIONES.md))
+
+Dos listas fijas, `favorites` y `watchlist`, comunes a la TV y a la web (un único perfil, como el progreso). Un elemento es un título entero o un capítulo de una serie (`?season=&episode=`, los dos o ninguno).
+
+### `GET /lists`
+
+Las dos listas, lo último añadido primero; títulos y capítulos por separado. Solo sale lo que tiene algún archivo disponible: lo de un disco desconectado se conserva y vuelve al reconectarlo. Los títulos tienen la forma de `GET /titles`; los capítulos, lo justo para pintar la tarjeta y reproducir (`fileId` = la copia con progreso, o la primera).
+
+```json
+{"favorites":{"titles":[{"id":"t7-61","kind":"movie","title":"1917","lists":["favorites"],…}],
+              "episodes":[{"titleId":"8dc1dc97518a","fileId":"1025e749251d","title":"Breaking Bad","year":"2008","season":2,"episode":1,
+                           "episodeName":"7-37","poster":"…","backdrop":"…","still":"/api/v1/files/1025e749251d/still?w=300",
+                           "position":352,"duration":2835,"addedAt":"2026-11-06T13:28:03Z"}]},
+ "watchlist":{"titles":[],"episodes":[]}}
+```
+
+### `PUT /lists/{list}/{titleId}` · `DELETE /lists/{list}/{titleId}`
+
+Añade o quita (`?season=1&episode=3` para un capítulo). 204; idempotentes. 404 si la lista o el título no existen; 400 si falta `season` o `episode`, o si se pide un capítulo de una película.
+
+**Lo que se termina de ver sale solo de Pendientes:** cuando `PUT /progress` marca un archivo como visto (> 92 %), se quita de `watchlist` la película o ese capítulo. Una serie entera se queda hasta que se quite a mano. Favoritos no cambia nunca solo.
 
 ## `GET /sources`
 

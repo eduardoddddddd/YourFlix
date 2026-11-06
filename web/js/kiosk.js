@@ -165,6 +165,9 @@
       var ficha = H.linkButton('Ver ficha', '#/titulo/' + encodeURIComponent(t.id), 'k-ficha');
       btns.appendChild(play);
       btns.appendChild(ficha);
+      if (!t.lists) t.lists = [];
+      btns.appendChild(H.listToggle('favorites', t.id, t.lists, null, true));
+      btns.appendChild(H.listToggle('watchlist', t.id, t.lists, null, true));
       info.appendChild(btns);
       s.play = play;
       s.ficha = ficha;
