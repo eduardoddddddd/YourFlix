@@ -53,6 +53,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/genres", s.genres)
 	mux.HandleFunc("GET /api/v1/facets", s.facets)
 	mux.HandleFunc("GET /api/v1/continue", s.continueWatching)
+	mux.HandleFunc("GET /api/v1/lists", s.lists)
+	mux.HandleFunc("PUT /api/v1/lists/{list}/{id}", s.changeList)
+	mux.HandleFunc("DELETE /api/v1/lists/{list}/{id}", s.changeList)
 	return s.lanOnly(cors(mux))
 }
 
@@ -77,7 +80,7 @@ func cors(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("Access-Control-Allow-Origin", "*")
 		h.Set("Access-Control-Allow-Headers", "Content-Type, Range")
-		h.Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
+		h.Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, DELETE, OPTIONS")
 		h.Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -148,6 +151,7 @@ type fileOut struct {
 	Progress *store.Progress `json:"progress,omitempty"`
 	Stream   string          `json:"stream"`
 	Episode  *episodeOut     `json:"episodeInfo,omitempty"`
+	Lists    []string        `json:"lists,omitempty"` // capítulo de serie: listas en las que está
 }
 
 type episodeOut struct {
@@ -188,6 +192,11 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
+	whole, epLists, err := s.DB.TitleLists(t.ID)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
 	out := make([]fileOut, 0, len(files))
 	eps := episodes(t.Meta)
 	for _, f := range files {
@@ -198,7 +207,7 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(f.Audio, &a)
 		json.Unmarshal(f.Subs, &sb)
 		p, _ := s.DB.ProgressOf(f.ID)
-		fo := fileOut{File: f, Compat: s.Profile.Check(f.Container, f.Bitrate, v, a, sb), Progress: p, Stream: "/api/v1/files/" + f.ID + "/stream"}
+		fo := fileOut{File: f, Compat: s.Profile.Check(f.Container, f.Bitrate, v, a, sb), Progress: p, Stream: "/api/v1/files/" + f.ID + "/stream", Lists: epLists[epKey(f)]}
 		if e, ok := eps[epKey(f)]; ok {
 			fo.Episode = &episodeOut{Name: e.Name, Overview: e.Overview, AirDate: e.AirDate}
 			if e.Still != "" {
@@ -214,6 +223,7 @@ func (s *Server) title(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, map[string]any{
 		"title":    t,
+		"lists":    whole,
 		"links":    links,
 		"poster":   imgURL(t.ID, "poster", t.Poster, 600),
 		"backdrop": imgURL(t.ID, "backdrop", t.Backdrop, 1920),
@@ -416,6 +426,11 @@ func (s *Server) putProgress(w http.ResponseWriter, r *http.Request) {
 	if err := s.DB.SaveProgress(p); err != nil {
 		s.fail(w, err)
 		return
+	}
+	if p.Watched {
+		if err := s.DB.ClearWatched(p.FileID); err != nil {
+			s.Log.Printf("pendientes %s: %v", p.FileID, err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

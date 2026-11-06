@@ -54,7 +54,7 @@ async function rowTo(k) {
 }
 async function menuTo(go) {
   await until('Escape', (f) => !!f.go, 4);
-  const items = ['home', 'movies', 'series', 'kiosk', 'search', 'settings'];
+  const items = ['home', 'movies', 'series', 'mylist', 'kiosk', 'search', 'settings'];
   const f = await focused();
   const d = items.indexOf(go) - items.indexOf(f.go);
   await press(d > 0 ? 'ArrowRight' : 'ArrowLeft', Math.abs(d));

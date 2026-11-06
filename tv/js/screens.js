@@ -33,13 +33,63 @@
     return line;
   }
 
+  // ---------- Favoritos y Pendientes de ver ----------
+  // state: array de listas del elemento (se actualiza en el sitio). ep: {season, episode} o null.
+  var LISTS = {
+    favorites: { title: 'Favoritos', on: '♥ En favoritos', off: '♥ Favorito', added: 'Añadido a Favoritos', removed: 'Quitado de Favoritos' },
+    watchlist: { title: 'Pendientes de ver', on: '✓ En pendientes', off: '+ Pendiente de ver', added: 'Añadido a Pendientes de ver', removed: 'Quitado de Pendientes de ver' }
+  };
+  S.LISTS = LISTS;
+
+  // toggleList: cambia la marca, pinta con paint() y avisa; si el servidor falla, la deshace.
+  // Las pantallas de debajo (Inicio, Mi lista) se recargan al volver.
+  S.toggleList = function (list, titleId, state, ep, paint) {
+    var on = state.indexOf(list) < 0;
+    if (on) state.push(list); else state.splice(state.indexOf(list), 1);
+    paint();
+    api.setList(list, titleId, on, ep).then(function () {
+      YF.toast(on ? LISTS[list].added : LISTS[list].removed);
+      YF.app.markDirty();
+    }, function () {
+      if (on) state.splice(state.indexOf(list), 1); else state.push(list);
+      paint();
+      YF.toast('No se pudo guardar');
+    });
+  };
+
+  // listButton: botón de la ficha. 'btn sym': el símbolo, y el texto solo con el foco (así caben
+  // junto a Reanudar · Desde el principio · Copia). 'mbtn': solo el símbolo (capítulos).
+  function listButton(list, titleId, state, ep, cls) {
+    var L = LISTS[list], b = el('span', cls);
+    function paint() {
+      var on = state.indexOf(list) >= 0, full = on ? L.on : L.off;
+      YF.clear(b);
+      b.appendChild(document.createTextNode(full.slice(0, 1)));
+      if (cls !== 'mbtn') b.appendChild(el('span', 'lbl', full.slice(1)));
+      b.classList.toggle('on', on);
+    }
+    paint();
+    return YF.f(b, function () { S.toggleList(list, titleId, state, ep, paint); });
+  }
+
+  function listBadges(lists) {
+    if (!lists || !lists.length) return null;
+    var box = el('span', 'lbadges');
+    if (lists.indexOf('favorites') >= 0) box.appendChild(el('span', 'lb fav', '♥'));
+    if (lists.indexOf('watchlist') >= 0) box.appendChild(el('span', 'lb', '✓'));
+    return box;
+  }
+
   // ---------- Tarjetas ----------
   function posterCard(t, onFocus) {
     var c = el('div', 'card');
+    c.dataset.id = t.id;
     var art = el('div', 'art');
     if (t.poster) art.appendChild(lazyImg(t.poster));
     else art.appendChild(el('div', 'ph', t.title));
     if (t.matched === false) art.appendChild(el('span', 'badge-pending', 'sin ficha'));
+    var lb = listBadges(t.lists);
+    if (lb) art.appendChild(lb);
     c.appendChild(art);
     c.appendChild(el('div', 'cap', t.title + (t.year ? ' (' + t.year + ')' : '')));
     return YF.f(c, function () { YF.app.open(S.detail(t.id)); }, onFocus ? function () { onFocus(t); } : null);
@@ -47,6 +97,7 @@
 
   function continueCard(c, onFocus) {
     var card = el('div', 'card wide');
+    card.dataset.id = c.titleId;
     var art = el('div', 'art');
     art.appendChild(lazyImg(c.still || c.backdrop || c.poster));
     var bar = el('div', 'pbar');
@@ -63,11 +114,35 @@
     }, onFocus ? function () { onFocus({ id: c.titleId, title: c.title, year: c.year, backdrop: c.backdrop }); } : null);
   }
 
+  // Capítulo de una lista: tarjeta ancha; OK lo reproduce (reanudando si está a medias).
+  function listEpisodeCard(e, onFocus, onExit) {
+    var card = el('div', 'card wide');
+    card.dataset.id = e.fileId;
+    var art = el('div', 'art');
+    art.appendChild(lazyImg(e.still || e.backdrop || e.poster));
+    if (e.watched) art.appendChild(el('span', 'watched', '✓'));
+    else if (e.position > 60) { var bar = el('div', 'pbar'); bar.style.width = Math.min(100, e.position / (e.duration || 1) * 100) + '%'; art.appendChild(bar); }
+    card.appendChild(art);
+    card.appendChild(el('div', 'cap', e.title + ' · ' + e.season + '×' + (e.episode < 10 ? '0' : '') + e.episode + (e.episodeName ? ' ' + e.episodeName : '')));
+    return YF.f(card, function () {
+      api.title(e.titleId).then(function (d) {
+        var f = d.files.filter(function (x) { return x.id === e.fileId; })[0];
+        if (f) S.play(d, f, !e.watched && e.position > 60 ? e.position : 0, onExit || function () { YF.app.refreshAll(); });
+        else YF.toast('Ese capítulo ya no está disponible');
+      }).catch(function () { YF.toast('No se pudo abrir'); });
+    }, onFocus ? function () { onFocus({ id: e.titleId, title: e.title, year: e.year, backdrop: e.backdrop }); } : null);
+  }
+
+  function listCards(l, onFocus) {
+    return (l.titles || []).map(function (t) { return posterCard(t, onFocus); })
+      .concat((l.episodes || []).map(function (e) { return listEpisodeCard(e, onFocus); }));
+  }
+
   function row(title, cards) {
     var r = el('section', 'row');
     r.appendChild(el('h2', '', title));
     var track = el('div', 'track');
-    cards.forEach(function (c) { track.appendChild(c); });
+    cards.forEach(function (c) { c.dataset.k = title + '|' + (c.dataset.id || track.children.length); track.appendChild(c); });
     r.appendChild(track);
     return r;
   }
@@ -123,14 +198,19 @@
         api.titles({ sort: 'added', limit: 20 }),
         api.titles({ sort: 'rating', kind: 'movie', limit: 20 }),
         api.titles({ kind: 'series', sort: 'rating', limit: 20 }),
-        api.get('/genres').catch(function () { return []; })
+        api.get('/genres').catch(function () { return []; }),
+        api.lists().catch(function () { return {}; })
       ]).then(function (r) {
-        var cont = r[0], added = r[1].items, rated = r[2].items, series = r[3].items, genres = r[4];
+        var cont = r[0], added = r[1].items, rated = r[2].items, series = r[3].items, genres = r[4], lists = r[5] || {};
         YF.clear(rows);
         var loading = sc.querySelector('.loading');
         if (loading) loading.parentNode.removeChild(loading);
         if (!added.length) { rows.appendChild(el('div', 'empty', 'La colección está vacía. Añade fuentes en el servidor: yourflix source add …')); return; }
         if (cont.length) rows.appendChild(row('Seguir viendo', cont.map(function (c) { return continueCard(c, setHero); })));
+        ['watchlist', 'favorites'].forEach(function (k) {
+          var cards = lists[k] ? listCards(lists[k], setHero) : [];
+          if (cards.length) rows.appendChild(row(LISTS[k].title, cards));
+        });
         rows.appendChild(row('Añadidas recientemente', added.map(function (t) { return posterCard(t, setHero); })));
         rows.appendChild(row('Películas mejor valoradas', rated.map(function (t) { return posterCard(t, setHero); })));
         if (series.length) rows.appendChild(row('Series', series.map(function (t) { return posterCard(t, setHero); })));
@@ -405,7 +485,16 @@
         if (meta.cast && meta.cast.length) { ppl.appendChild(document.createTextNode('   ·   Reparto ')); ppl.appendChild(el('b', '', meta.cast.slice(0, 5).join(', '))); }
         box.appendChild(ppl);
       }
-      if (!files.length) { box.appendChild(el('div', 'warn bad', 'Ningún archivo de este título está disponible ahora (¿disco desconectado?).')); linkRows(box, d); return null; }
+      if (!d.lists) d.lists = [];
+      if (!files.length) {
+        box.appendChild(el('div', 'warn bad', 'Ningún archivo de este título está disponible ahora (¿disco desconectado?).'));
+        var nb = el('div');
+        nb.appendChild(listButton('favorites', t.id, d.lists, null, 'btn sym'));
+        nb.appendChild(listButton('watchlist', t.id, d.lists, null, 'btn sym'));
+        box.appendChild(nb);
+        linkRows(box, d);
+        return nb.firstChild;
+      }
       return t.kind === 'series' ? renderSeries(d, box, files) : renderMovie(d, box, files);
     }
 
@@ -441,12 +530,14 @@
       var f = copyIdx ? files[copyIdx] : chooseFile(files);
       copyIdx = files.indexOf(f);
       techBlock(box, f);
-      var btns = el('div');
+      var btns = el('div', 'btnrow'); // en una línea: el texto del ♥ y del + aparece con el foco
       var pr = f.progress, resume = pr && !pr.watched && pr.position > 60;
       var onExit = function () { s.refresh().then(function (first) { YF.nav.focus(first); }); };
       var main = YF.f(el('span', 'btn primary', resume ? '▶ Reanudar desde ' + YF.clock(pr.position) : '▶ Reproducir'), function () { S.play(d, f, resume ? pr.position : 0, onExit); });
       btns.appendChild(main);
       if (resume) btns.appendChild(YF.f(el('span', 'btn', '↺ Desde el principio'), function () { S.play(d, f, 0, onExit); }));
+      btns.appendChild(listButton('favorites', d.title.id, d.lists, null, 'btn sym'));
+      btns.appendChild(listButton('watchlist', d.title.id, d.lists, null, 'btn sym'));
       if (files.length > 1) btns.appendChild(YF.f(el('span', 'btn', 'Copia ' + (copyIdx + 1) + '/' + files.length + ' ⟳'), function () { copyIdx = (copyIdx + 1) % files.length; var fresh = render(d); YF.nav.focus(s.el.querySelectorAll('.btn')[s.el.querySelectorAll('.btn').length - 1] || fresh); }));
       box.appendChild(btns);
       linkRows(box, d);
@@ -465,8 +556,16 @@
       var main = YF.f(el('span', 'btn primary', (resume ? '▶ Reanudar ' : '▶ Ver ') + epLabel(next)), function () { S.play(d, next, resume ? pr.position : 0, onExit); });
       var btns = el('div');
       btns.appendChild(main);
+      // La serie entera: el símbolo, para que quepan las temporadas en la misma fila.
+      btns.appendChild(listButton('favorites', d.title.id, d.lists, null, 'btn sym'));
+      btns.appendChild(listButton('watchlist', d.title.id, d.lists, null, 'btn sym'));
       box.appendChild(btns);
       linkRows(box, d);
+      // Marcas por capítulo («T×E»): varias copias del mismo capítulo comparten marca.
+      if (!d.epMarks) {
+        d.epMarks = {};
+        files.forEach(function (x) { if (x.season != null && x.episode != null && !d.epMarks[x.season + 'x' + x.episode]) d.epMarks[x.season + 'x' + x.episode] = (x.lists || []).slice(); });
+      }
       if (seasons.length > 1) {
         var tabs = el('span', 'seasons');
         seasons.forEach(function (n) {
@@ -487,6 +586,16 @@
         e.appendChild(el('div', 'ep-desc', info.overview || YF.clock(f.duration)));
         var p = f.progress, res = p && !p.watched && p.position > 60;
         track.appendChild(YF.f(e, function () { S.play(d, f, res ? p.position : 0, onExit); }));
+        // ♥ y + encima de la foto: ▲ desde el capítulo, ▼ vuelve a él.
+        var mk = f.season != null && f.episode != null ? d.epMarks[f.season + 'x' + f.episode] : null;
+        if (mk) {
+          var ep = { season: f.season, episode: f.episode }, acts = el('div', 'ep-lists');
+          var fav = listButton('favorites', d.title.id, mk, ep, 'mbtn'), wl = listButton('watchlist', d.title.id, mk, ep, 'mbtn');
+          fav._nav = { down: e }; wl._nav = { down: e };
+          e._nav = { up: fav };
+          acts.appendChild(fav); acts.appendChild(wl);
+          art.appendChild(acts);
+        }
       });
       eps.appendChild(track);
       s.el.appendChild(eps);
@@ -624,7 +733,7 @@
 
     // ---- Modos: menu (foco en el menú), view, buttons (Reproducir · Ver ficha), filter (barra) ----
     function setHint() {
-      hint.textContent = mode === 'buttons' ? '▲▼ elegir · OK aceptar · Atrás volver'
+      hint.textContent = mode === 'buttons' ? '◀▶ elegir · OK aceptar · Atrás volver'
         : mode === 'filter' ? '◀▶▲▼ moverse · OK cambiar · Atrás aplicar y cerrar'
         : '◀ ▶ cambiar · OK reproducir o ver ficha · ▼ filtros' + (cfg.auto ? ' · pase automático cada 20 s' : '') + ' · Atrás ' + (YF.app.stack[0] === s ? 'menú' : 'volver');
     }
@@ -646,9 +755,15 @@
       hint.textContent = '▼ volver al kiosco';
     }
 
+    // Reproducir · Ver ficha · ♥ · + (las marcas del título entero, como en la ficha).
     function drawBtns() {
       YF.clear(btns);
-      ['▶ Reproducir', 'Ver ficha'].forEach(function (label, n) { btns.appendChild(el('span', 'btn' + (n === btn ? ' focused' : '') + (n === 0 ? ' primary' : ''), label)); });
+      var ls = (s.cur && s.cur.t.lists) || [];
+      var labels = ['▶ Reproducir', 'Ver ficha', ls.indexOf('favorites') >= 0 ? LISTS.favorites.on : LISTS.favorites.off, ls.indexOf('watchlist') >= 0 ? LISTS.watchlist.on : LISTS.watchlist.off];
+      labels.forEach(function (label, n) {
+        var on = (n === 2 && ls.indexOf('favorites') >= 0) || (n === 3 && ls.indexOf('watchlist') >= 0);
+        btns.appendChild(el('span', 'btn' + (n === btn ? ' focused' : '') + (n === 0 ? ' primary' : '') + (on ? ' on' : ''), label));
+      });
     }
 
     function setButtons() {
@@ -663,6 +778,11 @@
       var c = s.cur;
       if (!c) return;
       if (btn === 1) { YF.app.open(S.detail(c.t.id)); return; }
+      if (btn >= 2) {
+        if (!c.t.lists) c.t.lists = [];
+        S.toggleList(btn === 2 ? 'favorites' : 'watchlist', c.t.id, c.t.lists, null, drawBtns);
+        return;
+      }
       if (!c.f) { YF.toast('Ningún archivo disponible ahora'); return; }
       var pr = c.f.progress, resume = pr && !pr.watched && pr.position > 60;
       setView();
@@ -747,7 +867,8 @@
         return true;
       }
       if (mode === 'buttons') {
-        if (k === 'Up' || k === 'Down' || k === 'Left' || k === 'Right') { btn = 1 - btn; drawBtns(); }
+        if (k === 'Left' || k === 'Up') { btn = (btn + 3) % 4; drawBtns(); }
+        else if (k === 'Right' || k === 'Down') { btn = (btn + 1) % 4; drawBtns(); }
         else if (k === 'Enter') act();
         else if (k === 'Back') setView();
         return true;
@@ -762,6 +883,38 @@
     s.onShow = function () { setView(); };
     s.onReturn = function (dirty) { if (dirty && s.cur) { delete cache[s.cur.t.id]; show(); } };
     s.refresh = function () { setView(); return load(); };
+    return s;
+  };
+
+  // ---------- Mi lista: Pendientes de ver y Favoritos ----------
+  S.mylist = function () {
+    var s = screen('mylist');
+    var sc = el('div', 'scroller mylist');
+    s.el.appendChild(sc);
+    s.refresh = function () {
+      return api.lists().then(function (r) {
+        YF.clear(sc);
+        var head = el('div', 'grid-head');
+        head.appendChild(el('h1', '', 'Mi lista'));
+        sc.appendChild(head);
+        var onExit = function () { s.dirty = false; s.refresh(); };
+        ['watchlist', 'favorites'].forEach(function (k) {
+          var l = r[k] || {}, titles = l.titles || [], eps = l.episodes || [];
+          sc.appendChild(el('h2', 'list-h', LISTS[k].title + (titles.length + eps.length ? '  ·  ' + (titles.length + eps.length) : '')));
+          if (!titles.length && !eps.length) {
+            sc.appendChild(el('p', 'list-empty', k === 'favorites'
+              ? 'Aún no hay nada. En una ficha, «♥ Favorito»; en un capítulo, ▲ y el ♥ de su foto.'
+              : 'Aún no hay nada. En una ficha, «+ Pendiente de ver»; en un capítulo, ▲ y el + de su foto. Lo que termines de ver sale solo.'));
+            return;
+          }
+          var g = el('div', 'grid');
+          titles.forEach(function (t) { var c = posterCard(t); c.dataset.k = k + '|' + t.id; g.appendChild(c); });
+          eps.forEach(function (e) { var c = listEpisodeCard(e, null, onExit); c.dataset.k = k + '|' + e.fileId; g.appendChild(c); });
+          sc.appendChild(g);
+        });
+        return sc.querySelector('.card') || null;
+      });
+    };
     return s;
   };
 

@@ -174,6 +174,7 @@ type TitleSummary struct {
 	Sources  []string `json:"sources"`
 	AddedAt  string   `json:"addedAt"` // llegada del archivo disponible más reciente (ver lastFileAt)
 	Matched  bool     `json:"matched"`
+	Lists    []string `json:"lists,omitempty"` // listas en las que está el título entero (favorites, watchlist)
 }
 
 // lastFileAt: fecha en que llegó el archivo disponible más reciente del título. Es la
@@ -243,7 +244,8 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 	}
 	q := `SELECT t.id,t.kind,t.title,t.year,t.meta,t.poster,t.backdrop,COALESCE(` + lastFileAt + `,t.added_at),t.match_source,
 		(SELECT COUNT(*) FROM files f WHERE f.title_id=t.id AND f.missing_since IS NULL),
-		(SELECT group_concat(DISTINCT s.label) FROM files f JOIN sources s ON s.id=f.source_id WHERE f.title_id=t.id AND f.missing_since IS NULL)
+		(SELECT group_concat(DISTINCT s.label) FROM files f JOIN sources s ON s.id=f.source_id WHERE f.title_id=t.id AND f.missing_since IS NULL),
+		(SELECT group_concat(l.list) FROM lists l WHERE l.title_id=t.id AND l.season=-1)
 		FROM ` + from + ` WHERE ` + where + ` ORDER BY ` + order + ` LIMIT ? OFFSET ?`
 	rows, err := db.Query(q, append(args, tq.Limit, tq.Offset)...)
 	if err != nil {
@@ -254,7 +256,8 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 	for rows.Next() {
 		var s TitleSummary
 		var meta, src, labels string
-		if err := rows.Scan(&s.ID, &s.Kind, &s.Title, &s.Year, &meta, &s.Poster, &s.Backdrop, &s.AddedAt, &src, &s.Files, &labels); err != nil {
+		var lists sql.NullString
+		if err := rows.Scan(&s.ID, &s.Kind, &s.Title, &s.Year, &meta, &s.Poster, &s.Backdrop, &s.AddedAt, &src, &s.Files, &labels, &lists); err != nil {
 			return nil, 0, err
 		}
 		var m struct {
@@ -265,6 +268,7 @@ func (db *DB) ListTitles(tq TitleQuery) ([]TitleSummary, int, error) {
 		s.Genres, s.Rating = m.Genres, m.Rating
 		s.Sources = strings.Split(labels, ",")
 		s.Matched = src != "filename"
+		s.Lists = splitLists(lists)
 		out = append(out, s)
 	}
 	return out, total, rows.Err()
@@ -293,6 +297,10 @@ func (db *DB) MoveFiles(from, to, matchSource string) error {
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`UPDATE files SET title_id=?, match_source=? WHERE title_id=?`, to, matchSource, from); err != nil {
+		return err
+	}
+	// Las listas pasan a la ficha de destino (al borrar la de origen se irían en cascada).
+	if _, err := tx.Exec(`INSERT INTO lists(list,title_id,season,episode,added_at) SELECT list,?,season,episode,added_at FROM lists WHERE title_id=? ON CONFLICT DO NOTHING`, to, from); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM titles WHERE id=? AND locked=0`, from); err != nil {

@@ -2,7 +2,7 @@
 (function (YF) {
   'use strict';
   var el = YF.el, $ = YF.$, nav = YF.nav;
-  YF.version = '0.4.0';
+  YF.version = '0.5.0';
 
   var app = YF.app = { stack: [], backAt: 0 };
   var screensEl = $('screens'), menu = $('menu');
@@ -77,8 +77,13 @@
       if (prev.onReturn) { var d = prev.dirty; prev.dirty = false; prev.onReturn(d); return; }
       if (prev.dirty && prev.refresh) {
         prev.dirty = false;
+        // Tras recargar, el foco vuelve a la misma tarjeta (fila + título) si sigue ahí.
+        var key = prev.last && prev.last.dataset ? prev.last.dataset.k : '';
         prev.refresh().then(function (first) {
-          if (current() === prev && (!nav.current || !document.body.contains(nav.current))) nav.focus(first);
+          if (current() !== prev || (nav.current && document.body.contains(nav.current))) return;
+          var same = null;
+          if (key) Array.prototype.some.call(prev.el.querySelectorAll('.f'), function (x) { if (x.dataset.k === key) { same = x; return true; } return false; });
+          nav.focus(same || first);
         });
       }
       return;

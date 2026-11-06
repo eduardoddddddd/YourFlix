@@ -15,7 +15,7 @@
     return caps;
   };
 
-  var NAV = { '': 'home', peliculas: 'movies', series: 'series', kiosco: 'kiosk', buscar: 'search', titulo: '', ver: '' };
+  var NAV = { '': 'home', peliculas: 'movies', series: 'series', 'mi-lista': 'mylist', kiosco: 'kiosk', buscar: 'search', titulo: '', ver: '' };
 
   function render() {
     var r = YF.parseRoute(location.hash), name = r.parts[0] || '';
@@ -35,6 +35,7 @@
         case 'peliculas': return S.grid(main, 'movie', r.query, r.lists);
         case 'series': return S.grid(main, 'series', r.query, r.lists);
         case 'kiosco': return S.kiosk(main, r.query, r.lists);
+        case 'mi-lista': return S.mylist(main);
         case 'buscar': return S.search(main, r.query);
         case 'titulo': return S.detail(main, r.parts[1], r.query);
         default: return S.home(main);

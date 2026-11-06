@@ -86,6 +86,15 @@ CREATE TABLE IF NOT EXISTS progress (
 	watched INTEGER NOT NULL DEFAULT 0,
 	updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS lists (                -- Favoritos y Pendientes de ver (lists.go)
+	list TEXT NOT NULL,                         -- favorites | watchlist
+	title_id TEXT NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+	season INTEGER NOT NULL DEFAULT -1,         -- -1/-1: el título entero; si no, un capítulo
+	episode INTEGER NOT NULL DEFAULT -1,
+	added_at TEXT NOT NULL,
+	PRIMARY KEY(list, title_id, season, episode)
+);
+CREATE INDEX IF NOT EXISTS lists_title ON lists(title_id);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tmdb_cache (url TEXT PRIMARY KEY, body BLOB NOT NULL, fetched_at TEXT NOT NULL);
 `

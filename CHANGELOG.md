@@ -2,6 +2,22 @@
 
 Versiones de YourFlix. Desde la 0.4.0, el número es el mismo para el servidor, la web y la app de la TV. Antes solo llevaba número la app de la TV. El detalle de cada entrega está en «Estado» de [README.md](README.md).
 
+## 0.5.0 — 06-11-2026 (rama `feat/listas`, sin desplegar)
+
+Favoritos y Pendientes de ver, en la TV y en la web. Probado en el navegador; falta desplegarlo y probarlo en la TV. Decisión: [ADR-008](docs/DECISIONES.md).
+
+### Nuevo
+
+- **♥ Favoritos y Pendientes de ver.** Cualquier película, serie o capítulo se puede marcar. En la ficha, botones ♥ y + junto a Reproducir; en cada capítulo, ♥ y + sobre su foto (en la TV, ▲ desde el capítulo); en el kiosco, junto a Reproducir · Ver ficha. Las listas son las mismas en la TV y en la web.
+- **«Mi lista»** en el menú (TV y web): Pendientes de ver y Favoritos, con los capítulos como tarjetas que se reproducen directamente. En Inicio, dos filas nuevas debajo de «Seguir viendo», solo si tienen algo.
+- **Carátulas con ♥ y marca** cuando el título está en una lista.
+- **Lo que se termina de ver sale solo de Pendientes** (la película o el capítulo).
+- **Servidor:** `GET /lists`, `PUT|DELETE /lists/{list}/{id}` y el campo `lists` en `/titles` y `/titles/{id}`. Solo se añade: las apps 0.4.0 siguen funcionando.
+
+### Cambiado
+
+- **TV:** al volver a una pantalla que se recarga (Inicio, Mi lista), el foco vuelve a la misma tarjeta si sigue ahí. En el kiosco, el aviso sale arriba para no tapar los botones.
+
 ## 0.4.0 — 27-10-2026
 
 Fichas navegables, «Filtrar por» y Kiosco, en la TV y en la web. Desplegado en el Ally y en la TV y probado por el usuario con el mando y en el navegador. Plan: [docs/PLAN-NAVEGACION-KIOSCO.md](docs/PLAN-NAVEGACION-KIOSCO.md).

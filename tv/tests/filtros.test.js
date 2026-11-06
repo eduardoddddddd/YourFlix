@@ -132,7 +132,7 @@ test('Chromium 85: ningún JS ni CSS de tv/ usa ?. ?? ni aspect-ratio', () => {
 test('menú y versión', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const order = [...html.matchAll(/data-go="(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(order, ['home', 'movies', 'series', 'kiosk', 'search', 'settings']);
+  assert.deepEqual(order, ['home', 'movies', 'series', 'mylist', 'kiosk', 'search', 'settings']);
   assert.ok(html.indexOf('js/filters.js') < html.indexOf('js/screens.js'));
   const cfg = fs.readFileSync(path.join(root, 'config.xml'), 'utf8');
   const app = fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8');
