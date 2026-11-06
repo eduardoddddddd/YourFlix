@@ -2,9 +2,9 @@
 
 Versiones de YourFlix. Desde la 0.4.0, el número es el mismo para el servidor, la web y la app de la TV. Antes solo llevaba número la app de la TV. El detalle de cada entrega está en «Estado» de [README.md](README.md).
 
-## 0.5.0 — 06-11-2026 (rama `feat/listas`, sin desplegar)
+## 0.5.0 — 06-11-2026
 
-Favoritos y Pendientes de ver, en la TV y en la web. Probado en el navegador; falta desplegarlo y probarlo en la TV. Decisión: [ADR-008](docs/DECISIONES.md).
+Favoritos y Pendientes de ver, en la TV y en la web. Servidor y web desplegados en el Ally; la app de la TV 0.5.0 está sin instalar y sin probar en la TV. Decisión: [ADR-008](docs/DECISIONES.md).
 
 ### Nuevo
 
