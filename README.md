@@ -69,7 +69,7 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
 
 ## Estado
 
-**06-11-2026 — versión 0.5.0: Favoritos y Pendientes de ver (rama `feat/listas`, sin desplegar).** Novedades en [CHANGELOG.md](CHANGELOG.md); decisión en [ADR-008](docs/DECISIONES.md); API en [docs/API.md](docs/API.md#listas-favoritos-y-pendientes-de-ver-050-adr-008).
+**06-11-2026 — versión 0.5.0: Favoritos y Pendientes de ver (rama `feat/listas`). Servidor y web desplegados en el Ally; app de la TV sin instalar.** Novedades en [CHANGELOG.md](CHANGELOG.md); decisión en [ADR-008](docs/DECISIONES.md); API en [docs/API.md](docs/API.md#listas-favoritos-y-pendientes-de-ver-050-adr-008).
 
 - **Hecho:**
   - **Servidor:** tabla `lists` (título entero o capítulo por temporada y número), `GET /lists`, `PUT|DELETE /lists/{list}/{id}` y `lists` en `/titles` y `/titles/{id}`. Lo visto sale solo de Pendientes; las marcas pasan a la ficha de destino al fusionar fichas. Versión 0.5.0.
@@ -85,9 +85,16 @@ En el navegador, `js/avplay-sim.js` simula AVPlay (y rechaza saltos solapados co
   - En el Ally, los puertos 8787–8790 son servidores del usuario (yourflix, yourroms, yourbook, yourmp3). Las pruebas van en el 8795 o más arriba.
   - `tools/tv-demo/e2e-categorias.mjs` se adaptó al menú nuevo, pero no se volvió a ejecutar: necesita la biblioteca de demostración.
   - Playwright no está en el repo: se usa `playwright-core` con `PLAYWRIGHT=<ruta>` y `PW_CHANNEL=msedge`.
-- **Siguiente paso:** con permiso del usuario y sin nada reproduciéndose:
-  1. desplegar el servidor 0.5.0 y `web/` en `C:YourFlixservidor` (corte de unos segundos; vuelta atrás con `yourflix.old.exe`);
-  2. instalar la app 0.5.0 desde el Mac (perfil CineT7, mismo ID) y probarla con el mando.
+- **Despliegue (06-11, 14:47), con permiso y sin conexiones abiertas:**
+  - binario 0.5.0 (de `feat/listas`, aún sin fusionar en `main`) y `web/` en `C:YourFlixservidor`;
+  - vuelta atrás: `yourflix.old.exe` (la versión de Tailscale) y `web-backup-20261106`; el 0.4.0 anterior queda como `yourflix.pre040b.exe`;
+  - comprobado desde `192.168.1.13:8787`: ping 0.5.0, `/lists`, títulos, vídeo con Range 206, «Seguir viendo» intacto, web con «Mi lista» y admin 200.
+- **App de la TV 0.5.0, pendiente.** No se pudo instalar desde el Ally:
+  - la TV estaba en reposo;
+  - su IP de desarrollo es la del Mac;
+  - no había ninguna sesión de Claude en el Mac;
+  - el Ally no tiene credenciales de GitHub para subir la rama.
+- **Siguiente paso:** subir `feat/listas` (o fusionarla en `main`). Después, desde el Mac con la TV encendida: `tizen build-web` + `package -s CineT7` + `install` (mismo ID) y prueba con el monitor CDP.
 
 **27-10-2026 — versión 0.4.0: fichas navegables, «Filtrar por» y Kiosco. Fusionada en `main`, desplegada en el Ally y en la TV, y probada por el usuario en la TV y en la web.** Novedades en [CHANGELOG.md](CHANGELOG.md).
 
